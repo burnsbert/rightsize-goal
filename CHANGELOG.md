@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+### Claude Code
+
+- New `claude-code/` implementation, distributed as a Claude Code plugin with a repository
+  marketplace manifest; two commands install it and `/plugin update` maintains it.
+- Seven subagent roles across Claude Haiku 4.5, Sonnet 5, Opus 5, and Fable 5.1, each
+  pinning model and effort, since the Agent tool has no dispatch-time effort override.
+- Roles are denied agent-spawning tools, so the escalation gate cannot be bypassed by a
+  worker escalating itself; a packaged test asserts this.
+- Skill resolves plugin-prefixed and bare role names at run time, and refuses to substitute
+  a default agent when a role is unavailable.
+- Session persistence built on `/goal` and the `ProposeGoal` tool, with the session-scoped
+  limits stated rather than implied.
+- Usage accounting reads per-subagent transcripts directly, so each assignment is measured
+  rather than apportioned. Deduplicates streaming records by request id, records the served
+  model and effort rather than the requested ones, and prices all five rate categories
+  including both cache-write TTLs.
+- Explicit unavailable results for expired tariffs, unpriced models, missing cache TTL
+  splits, records without request identity, and missing or ambiguous transcripts.
+- Optional file installer with copy, symlink, verification, conflict backups, and rollback;
+  it writes no configuration.
+- Public installation, usage, role-design, accounting, and release documentation.
+- Windows/macOS/Linux CI matrix for Python 3.11 and 3.13.
+
+### Codex
+
 - Codex skill with seven model/effort-specific roles and evidence-based escalation.
 - Persistent completion gate with time/iteration bounds and saved run state.
 - Local task usage ledger and versioned API-equivalent estimates.

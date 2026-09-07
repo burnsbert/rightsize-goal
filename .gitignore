@@ -2,3 +2,6 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .DS_Store
+
+# Rightsize Goal project scratch, if this repo is ever a target project
+.rightsize-goal/

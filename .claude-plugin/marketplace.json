@@ -1,0 +1,17 @@
+{
+  "name": "rightsize-goal",
+  "owner": {
+    "name": "Eric Burns"
+  },
+  "metadata": {
+    "description": "Cost-aware goal workflows that delegate to the lowest capable model tier.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "rightsize-goal",
+      "source": "./claude-code",
+      "description": "Pursue a goal with a small engineering team: route each bounded task to the lowest-cost Claude tier likely to succeed, verify results, and learn from measured usage."
+    }
+  ]
+}
