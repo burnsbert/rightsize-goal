@@ -1,0 +1,13 @@
+{
+  "version": "openai-standard-usd-2026-09-06",
+  "verified_on": "2026-09-06",
+  "valid_until": "2026-10-06",
+  "unit": "USD per million tokens",
+  "measurement": "Standard-rate API-equivalent estimate; excludes long-context and service-tier modifiers, cache writes, tool fees, taxes, and subscription billing adjustments.",
+  "models": {
+    "gpt-5.6-luna": {"input": 0.2, "cached_input": 0.02, "output": 1.2, "source": "https://developers.openai.com/api/docs/models/gpt-5.6-luna"},
+    "gpt-5.6-terra": {"input": 2.0, "cached_input": 0.2, "output": 12.0, "source": "https://developers.openai.com/api/docs/models/gpt-5.6-terra"},
+    "gpt-5.6-sol": {"input": 4.0, "cached_input": 0.4, "output": 20.0, "source": "https://developers.openai.com/api/docs/models/gpt-5.6-sol"},
+    "gpt-6-astra": {"input": 10.0, "cached_input": 1.0, "output": 50.0, "source": "https://developers.openai.com/api/docs/models/gpt-6-astra"}
+  }
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rightsize Goal"
+  short_description: "Pursue goals with economical, evidence-led delegation"
+  default_prompt: "Use $rightsize-goal to complete this objective with the lowest capable agent tier and a compact assignment log."
