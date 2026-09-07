@@ -13,6 +13,10 @@ import re
 import shutil
 import sys
 import tempfile
+
+if sys.version_info < (3, 11):
+    raise SystemExit("Python 3.11 or newer is required (try python3 or py -3.11).")
+
 import tomllib
 
 
@@ -65,7 +69,16 @@ def remove_role_blocks(text: str) -> str:
 
 
 def desired_config(text: str, codex: Path, root: Path) -> str:
+    original = tomllib.loads(text)
     text = remove_role_blocks(text)
+    cleaned = tomllib.loads(text)
+    expected = dict(original)
+    if isinstance(expected.get("agents"), dict):
+        expected["agents"] = {key: value for key, value in expected["agents"].items() if key not in ROLES}
+        if not expected["agents"] and "agents" not in cleaned:
+            del expected["agents"]
+    if cleaned != expected:
+        raise SystemExit("Cannot safely edit this config layout. Use standalone agent discovery or edit registrations manually.")
     blocks = []
     for role in ROLES:
         source = root / ".codex/agents" / f"{role}.toml"
@@ -81,7 +94,7 @@ def desired_config(text: str, codex: Path, root: Path) -> str:
     return combined
 
 
-def verify(root: Path, codex: Path, skills: Path) -> list[str]:
+def verify(root: Path, codex: Path, skills: Path, legacy_config: bool = False) -> list[str]:
     problems = []
     for source, target in paths(root, codex, skills):
         if not os.path.lexists(target):
@@ -91,6 +104,8 @@ def verify(root: Path, codex: Path, skills: Path) -> list[str]:
                 problems.append(f"wrong symlink target: {target}")
         elif not same_tree(source, target):
             problems.append(f"stale copy: {target}")
+    if not legacy_config:
+        return problems
     config = codex / "config.toml"
     try:
         parsed = tomllib.loads(config.read_text(encoding="utf-8-sig"))
@@ -116,6 +131,11 @@ def install(args: argparse.Namespace, root: Path, codex: Path, skills: Path) -> 
     if sys.version_info < (3, 11):
         raise SystemExit("Python 3.11 or newer is required.")
     pairs = paths(root, codex, skills)
+    for source, target in pairs:
+        # Never allow force/rollback to remove the package itself or an ancestor.
+        source_path, target_path = source.resolve(), target.parent.resolve() / target.name
+        if source_path == target_path or source_path.is_relative_to(target_path) or target_path.is_relative_to(source_path):
+            raise SystemExit(f"Install destination overlaps package source: {target}")
     for source, _ in pairs:
         if not source.exists():
             raise SystemExit(f"Package is incomplete; missing {source}")
@@ -126,14 +146,22 @@ def install(args: argparse.Namespace, root: Path, codex: Path, skills: Path) -> 
     skills.mkdir(parents=True, exist_ok=True)
     config = codex / "config.toml"
     old_config = config.read_bytes() if config.exists() else b""
-    old_text = old_config.decode("utf-8-sig").replace("\r\n", "\n").replace("\r", "\n")
-    new_text = desired_config(old_text, codex, root)
+    legacy_config = getattr(args, "legacy_config", False)
+    new_bytes = old_config
+    if legacy_config:
+        old_text = old_config.decode("utf-8-sig").replace("\r\n", "\n").replace("\r", "\n")
+        new_bytes = desired_config(old_text, codex, root).encode("utf-8")
+        old_agents = tomllib.loads(old_text).get("agents", {})
+        new_agents = tomllib.loads(new_bytes.decode("utf-8"))["agents"]
+        changed_roles = [role for role in ROLES if role in old_agents and old_agents[role] != new_agents[role]]
+        if changed_roles and not args.force:
+            raise SystemExit("Existing config registrations conflict: " + ", ".join(changed_roles) + ". Use --force to back up and replace them.")
 
     conflicts = []
     for source, target in pairs:
         if not os.path.lexists(target):
             continue
-        current = target.is_symlink() and target.resolve() == source.resolve()
+        current = args.method == "symlink" and target.is_symlink() and target.resolve() == source.resolve()
         if args.method == "copy" and not target.is_symlink() and same_tree(source, target):
             current = True
         if not current:
@@ -148,13 +176,13 @@ def install(args: argparse.Namespace, root: Path, codex: Path, skills: Path) -> 
     created: list[Path] = []
     temporary: Path | None = None
     try:
-        if conflicts or new_text.encode("utf-8") != old_config:
+        if conflicts or new_bytes != old_config:
             backup.mkdir(parents=True, exist_ok=False)
-        if config.exists() and new_text.encode("utf-8") != old_config:
+        if config.exists() and new_bytes != old_config:
             shutil.copy2(config, backup / "config.toml")
         for source, target in pairs:
             if os.path.lexists(target):
-                current = target.is_symlink() and target.resolve() == source.resolve()
+                current = args.method == "symlink" and target.is_symlink() and target.resolve() == source.resolve()
                 if args.method == "copy" and not target.is_symlink() and same_tree(source, target):
                     current = True
                 if current:
@@ -164,19 +192,22 @@ def install(args: argparse.Namespace, root: Path, codex: Path, skills: Path) -> 
                 shutil.move(target, destination)
                 moved.append((target, destination))
             target.parent.mkdir(parents=True, exist_ok=True)
+            created.append(target)
             if args.method == "symlink":
                 os.symlink(source, target, target_is_directory=source.is_dir())
             elif source.is_dir():
                 shutil.copytree(source, target, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
             else:
                 shutil.copy2(source, target)
-            created.append(target)
-        if new_text.encode("utf-8") != old_config:
-            with tempfile.NamedTemporaryFile("w", encoding="utf-8", newline="\n", dir=codex, delete=False) as output:
+        if new_bytes != old_config:
+            with tempfile.NamedTemporaryFile("wb", dir=codex, delete=False) as output:
                 temporary = Path(output.name)
-                output.write(new_text)
+                output.write(new_bytes)
             os.replace(temporary, config)
             temporary = None
+        problems = verify(root, codex, skills, legacy_config)
+        if problems:
+            raise RuntimeError("Installation verification failed:\n" + "\n".join(problems))
     except Exception as exc:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
@@ -196,9 +227,6 @@ def install(args: argparse.Namespace, root: Path, codex: Path, skills: Path) -> 
             raise SystemExit("Windows denied symlink creation. Enable Developer Mode, use an elevated terminal, or install with --method copy.") from exc
         raise
 
-    problems = verify(root, codex, skills)
-    if problems:
-        raise SystemExit("Installation verification failed:\n" + "\n".join(f"  {item}" for item in problems))
     method_label = "symbolic links" if args.method == "symlink" else "copies"
     print(f"Rightsize Goal installed with {method_label}.")
     if backup.exists():
@@ -208,7 +236,8 @@ def install(args: argparse.Namespace, root: Path, codex: Path, skills: Path) -> 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--method", choices=("symlink", "copy"), default="symlink")
+    parser.add_argument("--method", choices=("symlink", "copy"), default="copy")
+    parser.add_argument("--legacy-config", action="store_true", help="also register agents in config.toml for older hosts")
     parser.add_argument("--codex-dir", type=Path, default=Path(os.environ.get("CODEX_HOME", Path.home() / ".codex")))
     parser.add_argument("--skills-dir", type=Path, default=Path.home() / ".agents/skills")
     parser.add_argument("--force", action="store_true")
@@ -218,7 +247,7 @@ def main() -> int:
     codex = args.codex_dir.expanduser().resolve()
     skills = args.skills_dir.expanduser().resolve()
     if args.verify:
-        problems = verify(root, codex, skills)
+        problems = verify(root, codex, skills, args.legacy_config)
         if problems:
             print("Verification failed:", file=sys.stderr)
             for problem in problems:

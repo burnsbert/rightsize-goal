@@ -22,6 +22,15 @@ SPEC.loader.exec_module(usage)
 
 
 class TaskUsageTests(unittest.TestCase):
+    def test_missing_turn_labels_do_not_inherit_previous_model(self):
+        self.assertEqual(self._start()[0], 0)
+        self._append({"type": "turn_context", "payload": {}})
+        self._tokens(110, 22, 33, 11)
+        result = self._call("finish", "--run", "run-1", "--task", "task-1", "--outcome", "accepted")[1]
+        self.assertEqual(["unknown"], result["actual_models"])
+        self.assertEqual(["unknown"], result["actual_efforts"])
+        self.assertEqual("unavailable", result["cost_status"])
+
     def test_invalid_rates_and_inconsistent_categories_are_not_priced(self):
         tokens = {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30, "reasoning_output_tokens": 10, "cache_write_tokens": 0}
         for invalid in (-1, float("nan"), float("inf")):

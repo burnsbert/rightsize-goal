@@ -7,6 +7,8 @@ description: Pursue a goal with cost-aware task delegation, using the main sessi
 
 Run a persistent goal with a small engineering team. Choose the lowest-cost tier likely to do each task well. Delegate hard work before Luna wastes attempts; reserve Astra for evidenced Sol difficulty. This skill explicitly instructs the coordinator to use subagents for suitable bounded assignments.
 
+Discussing, reviewing, or installing this workflow is not itself a request to run a persistent goal. For execution, resolve a working Python 3.11+ interpreter (`python`, `python3`, or `py -3.11`) and use it consistently for the examples below. Resolve helpers relative to this installed skill. Installed role TOMLs are under `$CODEX_HOME/agents` (normally `~/.codex/agents`); when working from the distribution, they are under `codex/.codex/agents`.
+
 ## Cost and completion
 
 Optimize expected total spend to reach the user's acceptance conditions, including worker effort, context transfer, coordination, verification, and likely rework. Successful goal completion remains the objective. Do not weaken acceptance to save money, or buy expensive reassurance when adequate evidence already exists. The user's operating assumption is that Luna-to-Sol and Sol-to-Astra are large cost jumps; use that qualitative ordering without inventing prices or treating elapsed time as a billing meter.
@@ -122,7 +124,7 @@ Before each Astra assignment, log the linked Sol assignment(s), attempts/results
 
 ## Compact scratch contract
 
-Create the following header, a short current-state section, and an append-only event table. Only update current state; preserve historical rows. Use the computer's system-local date/time, formatted for direct human reading, e.g. `Sep 6, 2026, 6:15:30 PM`. Record the OS timezone name and current UTC offset once in the header; show a timezone abbreviation/offset on entries if the timezone changes or a daylight-saving transition would make the time ambiguous. Obtain time from the system clock (PowerShell `Get-Date -Format 'MMM d, yyyy, h:mm:ss tt'`), not by guessing from UTC. Stable IDs (`T001`, `T002`) connect assignments and outcomes. Escape table pipes and keep each event to one concise line. Use `apply_patch` when editing the scratch file. Preserve historical timestamps; do not relabel old UTC rows as local without converting them.
+Create the following header, a short current-state section, and an append-only event table. Only update current state; preserve historical rows. Use the computer's system-local date/time, formatted for direct human reading, e.g. `Sep 6, 2026, 6:15:30 PM`. Record the OS timezone name and current UTC offset once in the header; show a timezone abbreviation/offset on entries if the timezone changes or a daylight-saving transition would make the time ambiguous. Obtain time from the system clock (PowerShell `Get-Date -Format 'MMM d, yyyy, h:mm:ss tt'`, or Python `datetime.now().astimezone().strftime('%b %d, %Y, %I:%M:%S %p %Z (UTC%z)')` after importing `datetime` from `datetime`), not by guessing from UTC. Stable IDs (`T001`, `T002`) connect assignments and outcomes. Escape table pipes and keep each event to one concise line. Use `apply_patch` when editing the scratch file. Preserve historical timestamps; do not relabel old UTC rows as local without converting them.
 
 ```markdown
 # Rightsize goal: <run-id>

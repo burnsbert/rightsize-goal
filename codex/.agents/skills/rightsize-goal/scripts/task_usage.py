@@ -103,7 +103,7 @@ def _iter_relevant(path: Path):
                     kind, payload = _event_kind(raw)
                     if kind:
                         yield kind, payload
-    except OSError as exc:
+    except (OSError, UnicodeError) as exc:
         raise UsageError(f"cannot read session telemetry {path}: {exc}") from exc
 
 
@@ -184,6 +184,9 @@ def snapshot(path: Path) -> dict[str, Any]:
     resets = 0
     for kind, payload in _iter_relevant(path):
         if kind == "turn_context":
+            # A new turn without attribution must not inherit the preceding turn's labels.
+            model = "unknown"
+            effort = "unknown"
             candidate = payload.get("model")
             if isinstance(candidate, str) and candidate.strip():
                 model = candidate
@@ -437,7 +440,7 @@ def main(argv: Sequence[str] | None = None, *, stdout: TextIO = sys.stdout, stde
         result = {"start": start, "finish": finish, "report": report}[args.command](args)
         print(json.dumps(result, sort_keys=True), file=stdout)
         return 0
-    except UsageError as exc:
+    except (UsageError, OSError, sqlite3.Error) as exc:
         print(json.dumps({"error": str(exc)}), file=stderr)
         return 1
 

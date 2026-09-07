@@ -26,6 +26,18 @@ START = datetime(2026, 1, 2, 12, 0, tzinfo=timezone.utc)
 
 
 class GoalGateTests(unittest.TestCase):
+    def test_corrupt_encoding_and_boolean_version_are_rejected(self):
+        self.init()
+        saved = json.loads(self.state.read_text(encoding="utf-8"))
+        saved["version"] = True
+        for data in (b"\xff", json.dumps(saved).encode("utf-8")):
+            with self.subTest(data=data):
+                self.state.write_bytes(data)
+                code, _, error = self.run_cli(["check", "--state", str(self.state)])
+                self.assertEqual(1, code)
+                self.assertIsNotNone(error)
+                self.assertEqual(data, self.state.read_bytes())
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)

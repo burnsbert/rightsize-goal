@@ -3,6 +3,7 @@ import importlib.util
 import tempfile
 import tomllib
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 
@@ -27,8 +28,86 @@ class InstallTests(unittest.TestCase):
     def tearDown(self):
         self.temporary.cleanup()
 
-    def args(self, force=False):
-        return argparse.Namespace(method="copy", force=force)
+    def args(self, force=False, legacy_config=True):
+        return argparse.Namespace(method="copy", force=force, legacy_config=legacy_config)
+
+    def test_standalone_install_preserves_config_bytes(self):
+        original = self.config.read_bytes()
+        installer.install(self.args(legacy_config=False), self.package, self.codex, self.skills)
+        self.assertEqual(original, self.config.read_bytes())
+        self.assertEqual([], installer.verify(self.package, self.codex, self.skills))
+
+    def test_fresh_standalone_install_does_not_create_config(self):
+        self.config.unlink()
+        installer.install(self.args(legacy_config=False), self.package, self.codex, self.skills)
+        self.assertFalse(self.config.exists())
+        self.assertEqual([], installer.verify(self.package, self.codex, self.skills))
+
+    def test_legacy_registration_conflict_requires_force(self):
+        original = '[agents.rightsize-junior-doer]\nconfig_file = "custom.toml"\n'
+        self.config.write_text(original, encoding="utf-8")
+        with self.assertRaisesRegex(SystemExit, "registrations conflict"):
+            installer.install(self.args(), self.package, self.codex, self.skills)
+        self.assertEqual(original, self.config.read_text(encoding="utf-8"))
+        self.assertFalse((self.skills / "rightsize-goal").exists())
+
+    def test_failure_restores_conflicting_resources(self):
+        installer.install(self.args(), self.package, self.codex, self.skills)
+        target = self.codex / "agents" / f"{installer.ROLES[0]}.toml"
+        target.write_text("user content", encoding="utf-8")
+        original = self.config.read_bytes()
+        with patch.object(installer.shutil, "copy2", side_effect=OSError("copy failed")):
+            with self.assertRaisesRegex(OSError, "copy failed"):
+                installer.install(self.args(force=True), self.package, self.codex, self.skills)
+        self.assertEqual("user content", target.read_text(encoding="utf-8"))
+        self.assertEqual(original, self.config.read_bytes())
+
+    def test_partial_copy_failure_rolls_back(self):
+        original = self.config.read_bytes()
+        def fail_copy(source, target, **kwargs):
+            target.mkdir()
+            (target / "partial").write_text("partial", encoding="utf-8")
+            raise OSError("disk full")
+        with patch.object(installer.shutil, "copytree", side_effect=fail_copy):
+            with self.assertRaisesRegex(OSError, "disk full"):
+                installer.install(self.args(), self.package, self.codex, self.skills)
+        self.assertFalse((self.skills / "rightsize-goal").exists())
+        self.assertEqual(original, self.config.read_bytes())
+
+    def test_post_install_verification_failure_rolls_back(self):
+        original = self.config.read_bytes()
+        with patch.object(installer, "verify", return_value=["bad install"]):
+            with self.assertRaisesRegex(RuntimeError, "bad install"):
+                installer.install(self.args(), self.package, self.codex, self.skills)
+        self.assertFalse((self.skills / "rightsize-goal").exists())
+        self.assertEqual(original, self.config.read_bytes())
+
+    def test_forced_source_overlap_is_rejected(self):
+        with self.assertRaisesRegex(SystemExit, "overlaps"):
+            installer.install(self.args(force=True), self.package,
+                              self.package / ".codex", self.package / ".agents/skills")
+
+    def test_legacy_edit_rejects_invalid_or_unsafe_config(self):
+        for content in ('invalid = [', 'note = """\n[agents.rightsize-junior-doer]\nkept = 1\n"""\n'):
+            with self.subTest(content=content):
+                self.config.write_text(content, encoding="utf-8")
+                with self.assertRaises((SystemExit, installer.tomllib.TOMLDecodeError)):
+                    installer.install(self.args(), self.package, self.codex, self.skills)
+                self.assertEqual(content, self.config.read_text(encoding="utf-8"))
+                self.assertFalse((self.skills / "rightsize-goal").exists())
+
+    def test_symlink_to_copy_requires_force_then_converts(self):
+        self.skills.mkdir(parents=True)
+        link = self.skills / "rightsize-goal"
+        try:
+            link.symlink_to(self.package / ".agents/skills/rightsize-goal", target_is_directory=True)
+        except OSError as exc:
+            self.skipTest(f"symlinks unavailable: {exc}")
+        with self.assertRaises(SystemExit):
+            installer.install(self.args(), self.package, self.codex, self.skills)
+        installer.install(self.args(force=True), self.package, self.codex, self.skills)
+        self.assertFalse(link.is_symlink())
+        self.assertEqual([], installer.verify(self.package, self.codex, self.skills, True))
 
     def test_copy_install_is_verifiable_idempotent_and_preserves_config(self):
         installer.install(self.args(), self.package, self.codex, self.skills)

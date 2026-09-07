@@ -121,7 +121,7 @@ def _validate_state(raw: object) -> dict:
     }
     if set(raw) != required:
         raise GateError("state fields are missing or unrecognized")
-    if raw["version"] != STATE_VERSION:
+    if type(raw["version"]) is not int or raw["version"] != STATE_VERSION:
         raise GateError("unsupported state version")
     if not isinstance(raw["objective"], str) or not raw["objective"].strip():
         raise GateError("state objective must be nonempty")
@@ -173,7 +173,7 @@ def _load_state(path: Path) -> dict:
             raw = json.load(stream)
     except FileNotFoundError as exc:
         raise GateError(f"state does not exist: {path}") from exc
-    except (OSError, json.JSONDecodeError) as exc:
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise GateError(f"cannot read valid state: {path}: {exc}") from exc
     return _validate_state(raw)
 
