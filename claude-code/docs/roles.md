@@ -26,11 +26,17 @@ On Claude Code, cost moves along two axes, and the second one matters more here 
 does on Codex.
 
 **Model.** Published per-million rates put roughly a tenfold spread between the cheapest
-and most expensive model in the ladder. That is a real gap, but it is much flatter than
-the Codex lineup's, where the cheapest and most expensive models differ by about fiftyfold.
-The practical consequence: dropping one model tier saves less than the tier names imply,
-and a single rework cycle can erase it. The ladder is therefore not a licence to route
-everything downward — it is a reason to route by task fit and measure the outcome.
+and most expensive model in the ladder. That is a real gap, but it is much flatter than the
+Codex lineup's, and the difference is not evenly distributed. On Codex the step from Terra to
+Sol is enormous — a mid-tier model to a frontier one, with the price to match — so routing a
+task down a tier there is a decision with large consequences in both directions. The Claude
+equivalent, Sonnet 5 to Opus 5, is a far smaller step in both price and capability. Sonnet 5
+is a strong model that handles a great deal of real work, which means the cost of routing it
+wrongly is lower, and so is the saving from routing it downward.
+
+The practical consequence: dropping one model tier saves less than the tier names imply, and
+a single rework cycle can erase it. The ladder is not a licence to route everything downward —
+it is a reason to route by task fit and measure the outcome.
 
 **Effort.** Sonnet 5, Opus 5, and Fable 5.1 accept `low` through `max`, and effort changes
 how many tokens a model spends at a fixed rate. Claude Code's session default is `xhigh`.
@@ -43,6 +49,27 @@ This is why the roles ship as files. The Agent tool can override a subagent's `m
 dispatch, but it cannot override `effort`. Only a role definition can pin both, so a
 generic agent with a model override does not reproduce a role and must not be substituted
 for one.
+
+## What a dispatch actually costs
+
+Two measured figures from this machine, both from real runs rather than estimates.
+
+A trivial assignment dispatched as a plain in-process subagent — one that does nothing but
+reply — cost about **$0.0095** at the junior role and about **$0.0238** at the lower-midlevel
+role. Almost all of that is the worker's system prompt billed as cache-write tokens. That is the
+floor price of a dispatch.
+
+The same junior role dispatched as an Agent Teams *teammate*, doing a genuinely trivial two-line
+test addition, cost **$0.0434 across 93,956 tokens and 9 requests**. A teammate is a full session:
+it loads its own project instructions and orients itself before it reaches your task. Its floor is
+roughly four to five times a subagent's.
+
+The lesson is not "avoid teammates" — reuse across several related assignments repays that startup
+cost quickly. The lesson is that a teammate is the wrong shape for one tiny errand, and that
+dispatch overhead, not model rate, dominates the price of small work. Bundle accordingly.
+
+These are single runs on one machine, not a benchmark. Let the ledger replace them with your own
+project's evidence.
 
 ## Why the junior role is Haiku only
 
@@ -57,14 +84,9 @@ Haiku's band is genuinely narrow, and the role description says so:
   than its price gap suggests.
 - It is only about half the per-token price of Sonnet 5, so the savings are modest.
 
-It still earns a place. A measured probe of one trivial assignment on one machine — a
-single dispatch that does nothing but reply — cost about **$0.0095** at the junior role
-and about **$0.0238** at the lower-midlevel role, almost all of it the worker's system
-prompt billed as cache-write tokens. That is the floor price of a dispatch, and the junior
-role's floor is meaningfully lower. For genuinely mechanical, low-rework work it pays;
-for anything that might come back for a second attempt it does not. Those are two runs,
-not a benchmark; treat them as an order of magnitude, and let the ledger replace them with
-your own project's evidence.
+It still earns a place. As the measured figures above show, its dispatch floor is meaningfully
+lower than the lower-midlevel role's. For genuinely mechanical, low-rework work that pays; for
+anything likely to come back for a second attempt it does not.
 
 ## Why not fewer roles
 

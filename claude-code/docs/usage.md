@@ -9,9 +9,16 @@ configuration:
 /effort medium
 ```
 
-Other root models work; the skill discloses a mismatch once and continues. A skill's
-frontmatter can only override model and effort for a single turn, so this workflow does not
-try to set them for you — the session settings above are what actually hold.
+The coordinator needs enough judgment to route, verify, and decide acceptance — not a specific
+model. Opus at `medium` and Sonnet 5 at `high` are both capable choices; Haiku is not suitable
+for this role. A skill's frontmatter can only override model and effort for a single turn, so
+this workflow does not try to set them for you — the session settings above are what actually
+hold.
+
+If `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is set, workers run as reusable teammates and the
+coordinator can send follow-up assignments to a warm worker. Without it, each dispatch is a
+fresh in-process subagent and the coordinator bundles related work more aggressively instead.
+Both modes are supported; see [Agent Teams](install.md#agent-teams-recommended).
 
 ## Invoking the skill
 

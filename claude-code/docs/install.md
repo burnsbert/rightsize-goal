@@ -92,6 +92,36 @@ Moving or deleting the clone breaks it. Windows symlinks require Developer Mode 
 sufficient privileges; the default copy method requires neither. To convert a symlink
 install back to copies, use `--method copy --force`.
 
+## Agent Teams (recommended)
+
+Rightsize Goal works with or without Claude Code's Agent Teams feature, but it works better
+with it. Enable it by setting an environment variable before launching Claude Code:
+
+```sh
+export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+```
+
+This is the only switch: there is no settings key and no slash command for it, and the name
+says what it is — experimental, and subject to change.
+
+**With Agent Teams on**, a worker dispatched with a name becomes a *teammate*: it runs as its
+own addressable session, `ListAgents` lists it, and the coordinator can send it follow-up
+assignments with `SendMessage` while its context is still warm. That reuse is the point. Re-explaining
+a task to a fresh worker costs real tokens, and reuse avoids paying it twice.
+
+**With Agent Teams off**, the coordinator omits the name and dispatches an ordinary in-process
+subagent. Everything still works — routing, the escalation gate, the completion gate, and usage
+accounting are all unaffected. The one thing you lose is reuse: a follow-up needs a fresh worker
+that must be given its context again. The skill detects which mode is live, adapts, and says in
+its final report when reuse was unavailable.
+
+A teammate is a whole session rather than a lightweight helper, so it loads its own project
+instructions and orients itself before touching the work you assigned. Its floor cost per
+dispatch is therefore several times a plain subagent's — see
+[why these seven roles](roles.md#what-a-dispatch-actually-costs) for measured figures. Bundle
+related work into one assignment rather than spawning a teammate for something smaller than its
+own startup cost.
+
 ## Update, conflicts, and recovery
 
 For a plugin install:
@@ -153,6 +183,10 @@ records. Delete those separately only if you want to discard that history.
   roles, and the workflow will refuse to substitute a default agent for them.
 - **"Agent type not found".** Under a plugin install the roles need the
   `rightsize-goal:` prefix. Read the available-agents list and use the exact string.
+- **Usage shows as unavailable for a named worker.** With Agent Teams on, a teammate writes its
+  own session transcript rather than a file under `subagents/`. The helper resolves both layouts
+  from the `<agentName>@<teamName>` id the Agent tool returns; if it still cannot find one, pass
+  `--transcript PATH` explicitly.
 - **Model unavailable.** Check `/model`, or probe with
   `claude --model fable -p 'Reply with exactly: OK'`. Installing a role does not grant
   access. Do not silently repoint a role at a different model: see

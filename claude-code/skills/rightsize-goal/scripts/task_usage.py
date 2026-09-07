@@ -78,13 +78,70 @@ def _unique_match(matches: Sequence[Path], description: str) -> Path | None:
     return resolved[0]
 
 
+def _teammate_identity(path: Path) -> tuple[str | None, str | None]:
+    """Read the ``agentName``/``teamName`` labels a teammate session records.
+
+    Returns ``(None, None)`` for an ordinary session transcript. Only the first
+    few records carry these labels, so the scan short-circuits rather than
+    reading a long transcript to the end.
+    """
+    try:
+        with path.open("r", encoding="utf-8") as stream:
+            for index, line in enumerate(stream):
+                if index > 200:
+                    break
+                if '"agentName"' not in line:
+                    continue
+                try:
+                    raw = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(raw, dict) and isinstance(raw.get("agentName"), str):
+                    team = raw.get("teamName")
+                    return raw["agentName"], team if isinstance(team, str) else None
+    except (OSError, UnicodeError):
+        return None, None
+    return None, None
+
+
+def resolve_teammate_transcript(agent_id: str, root: Path) -> Path | None:
+    """Locate the session transcript of an Agent Teams teammate.
+
+    With Agent Teams enabled, a named agent runs as its own session rather than
+    as an in-process subagent, so its usage lands in
+    ``projects/<slug>/<session-id>.jsonl`` and not under ``subagents/``. The
+    Agent tool returns ``<agentName>@<teamName>``, and both labels are recorded
+    inside that transcript, so this is an exact match rather than a guess.
+    """
+    name, _, team = agent_id.partition("@")
+    if not name:
+        return None
+    matches = []
+    for candidate in root.glob("projects/*/*.jsonl"):
+        found_name, found_team = _teammate_identity(candidate)
+        if found_name != name:
+            continue
+        if team and found_team and found_team != team:
+            continue
+        matches.append(candidate)
+    return _unique_match(matches, f"teammate {agent_id}")
+
+
 def resolve_agent_transcript(agent_id: str, root: Path, session_id: str | None = None) -> Path | None:
-    """Locate ``agent-<agent_id>.jsonl`` under any project/session subagents directory."""
+    """Locate an assignment's transcript, in either dispatch mode.
+
+    An in-process subagent writes ``<session>/subagents/agent-<agent_id>.jsonl``.
+    A teammate writes its own top-level session transcript. Both are supported so
+    the workflow measures usage whether or not Agent Teams is enabled.
+    """
     if not agent_id.strip():
         raise UsageError("agent id must be nonempty")
     session = session_id if session_id else "*"
     pattern = f"projects/*/{session}/subagents/agent-{agent_id}.jsonl"
-    return _unique_match(list(root.glob(pattern)), f"agent {agent_id}")
+    subagent = _unique_match(list(root.glob(pattern)), f"agent {agent_id}")
+    if subagent is not None:
+        return subagent
+    return resolve_teammate_transcript(agent_id, root)
 
 
 def resolve_session_transcript(session_id: str, root: Path) -> Path | None:

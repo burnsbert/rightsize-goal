@@ -269,6 +269,57 @@ class HonestGapTests(Fixture):
         self.assertEqual(3, result["tokens"]["output"])
 
 
+class TeammateDiscoveryTests(Fixture):
+    """Agent Teams runs a named agent as its own session, not as a subagent."""
+
+    def teammate(self, name, team, records):
+        path = self.claude / "projects" / "-tmp-proj" / f"{name}-session.jsonl"
+        header = {"type": "user", "agentName": name, "teamName": team,
+                  "sessionId": f"{name}-session", "isSidechain": False}
+        self.write(path, [header, *records])
+        return path
+
+    def test_resolves_a_teammate_from_the_returned_agent_id(self):
+        expected = self.teammate("worker-a", "session-abc",
+                                 [turn("req-1", sidechain=False, out=5)])
+        found = usage.resolve_agent_transcript("worker-a@session-abc", self.claude)
+        self.assertEqual(expected.resolve(), found)
+
+    def test_teammate_usage_is_measured_and_priced(self):
+        self.teammate("worker-a", "session-abc",
+                      [turn("req-1", sidechain=False, inp=100, out=50)])
+        self.assertEqual(0, self.start("--new-agent", agent="worker-a@session-abc")[0])
+        result = self.finish()[1]
+        self.assertEqual("available", result["usage_status"])
+        self.assertEqual(50, result["tokens"]["output"])
+        self.assertAlmostEqual((100 * 1 + 50 * 16) / 1_000_000, result["cost_usd"])
+
+    def test_a_plain_subagent_still_resolves_when_teams_is_off(self):
+        # The fallback must not regress the non-teams dispatch path.
+        self.write(self.agent_file("abc123"), [turn("req-1", out=7)])
+        found = usage.resolve_agent_transcript("abc123", self.claude)
+        self.assertEqual(self.agent_file("abc123").resolve(), found)
+
+    def test_the_wrong_team_does_not_match(self):
+        self.teammate("worker-a", "session-abc", [turn("req-1", sidechain=False, out=5)])
+        self.assertIsNone(usage.resolve_agent_transcript("worker-a@session-zzz", self.claude))
+
+    def test_an_ordinary_session_is_never_mistaken_for_a_teammate(self):
+        self.write(self.session_file(), [turn("req-1", sidechain=False, out=5)])
+        self.assertIsNone(usage.resolve_agent_transcript("worker-a@session-abc", self.claude))
+
+    def test_duplicate_teammate_names_are_ambiguous_not_guessed(self):
+        self.teammate("worker-a", "session-abc", [turn("req-1", sidechain=False, out=5)])
+        other = self.claude / "projects" / "-tmp-other"
+        other.mkdir(parents=True)
+        self.write(other / "dup.jsonl", [
+            {"type": "user", "agentName": "worker-a", "teamName": "session-abc"},
+            turn("req-2", sidechain=False, out=5),
+        ])
+        with self.assertRaisesRegex(usage.UsageError, "multiple transcripts match"):
+            usage.resolve_agent_transcript("worker-a@session-abc", self.claude)
+
+
 class ReportTests(Fixture):
     def test_report_groups_by_served_model_effort_and_tariff(self):
         self.write(self.agent_file("a1"), [turn("req-1", out=10)])

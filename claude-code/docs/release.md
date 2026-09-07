@@ -26,13 +26,16 @@ rather than assumed. Do not describe this review as a guarantee of error-free be
   produced above. It discovered both files from the agent ID alone, deduplicated the
   streaming records, recorded the exact served model identifiers and efforts, and produced
   cost figures matching an independent hand calculation to the cent fraction.
+- The documented GitHub plugin install was run end to end against the published remote into an
+  isolated configuration directory: marketplace add, install, and `plugin details` reporting one
+  skill and seven agents.
 - The installer was exercised against a temporary configuration directory for install,
   verify, idempotent rerun, conflict refusal, forced replacement with backup, and
   post-force verification.
 
 ### Automated coverage
 
-56 tests pass locally:
+62 tests pass locally:
 
 ```sh
 python3 -m unittest discover -s claude-code/tests -p "test_*.py"
@@ -45,7 +48,41 @@ rollback on partial copy, rollback on verification failure, source/destination o
 incomplete package), the completion gate, and usage accounting against synthetic
 transcripts (all five rate categories, streaming deduplication, reused-agent baselines,
 main-session scope excluding sidechain records, idempotent finish, one active task per
-agent, and every honest-gap path listed in [accounting](accounting.md)).
+agent, and every honest-gap path listed in [accounting](accounting.md)), and teammate
+discovery (resolving `<agentName>@<teamName>` to its session transcript, not regressing the plain
+subagent path, rejecting a wrong team, never mistaking an ordinary session for a teammate, and
+reporting duplicates as ambiguous rather than guessing).
+
+### First live workflow run: September 7, 2026
+
+A real end-to-end run was executed on a disposable project: one objective, one dispatch to
+`rightsize-junior-doer`, with the gate, scratch log, and ledger all exercised. The work itself
+was correct — the right test added in the existing style, `greeting.py` left untouched, scope
+respected — and both assertions were verified independently by the coordinator. Four defects
+surfaced, all now fixed:
+
+1. **Agent Teams changed the dispatch shape.** With `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`
+   set, naming a worker makes it a teammate running as its own session, whose transcript is a
+   top-level `projects/<slug>/<session-id>.jsonl` rather than a file under `subagents/`. The
+   returned id is `<agentName>@<teamName>`, which the original discovery logic could not
+   resolve, and the team's own `config.json` records no member session id. Fixed by matching
+   the `agentName`/`teamName` labels recorded inside the transcript — an exact match, not a
+   heuristic. Both dispatch modes are now supported and covered by tests.
+2. **The skill assumed an Opus coordinator.** It now states the requirement as capability
+   rather than identity: Opus/medium and Sonnet 5/high are both good choices, Haiku is not.
+3. **A specified fallback check silently verified nothing.** The dispatch offered
+   `unittest discover` as a fallback for pytest-style tests, which collects zero cases and
+   exits successfully — `NO TESTS RAN` reads as a pass. The skill now requires confirming that
+   an acceptance check actually ran the expected number of cases, and treats a zero-case pass
+   as a failed verification.
+4. **A receipt imitated runner output.** The worker reported hand-written `✓ PASSED` lines for
+   a check it had performed by direct invocation rather than the named runner. All seven role
+   files now require the literal command and its real output, forbid composing tick marks or a
+   pass summary, and require saying what was run instead when a runner is unavailable.
+
+Measured from that run: the teammate dispatch cost **$0.0434 across 93,956 tokens and 9
+requests** for a two-line change, against a measured in-process subagent floor of **$0.0095**
+at the same role. Dispatch overhead, not model rate, dominates the cost of small work.
 
 ### Not covered by any automated test
 

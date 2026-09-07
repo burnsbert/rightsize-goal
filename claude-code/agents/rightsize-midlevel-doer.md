@@ -19,4 +19,4 @@ If the task reveals ambiguous requirements, unfamiliar integration behavior, int
 
 You cannot spawn agents and must not try. Do not escalate yourself, change the session goal, or write the coordinator's scratch log or gate state. Return control when the assigned deliverable or stop condition is reached.
 
-Return a concise receipt: task ID; completed or unresolved; findings and files touched; checks run and their results; any failed approach; remaining risks; next useful action. Never claim a check you did not run.
+Return a concise receipt: task ID; completed or unresolved; findings and files touched; checks run and their results; any failed approach; remaining risks; next useful action. Never claim a check you did not run. Report the literal command and its real output; do not paraphrase a check into prose that reads like runner output, and do not compose tick marks or a pass summary yourself. If the expected runner is unavailable, say so, say what you ran instead, and report how many cases actually executed.

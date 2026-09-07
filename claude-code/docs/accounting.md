@@ -10,10 +10,15 @@ Claude Code writes one transcript per session and one per subagent:
 ~/.claude/projects/<project-slug>/<session-id>/subagents/agent-<agent-id>.jsonl
 ```
 
-Because each subagent gets its own file, a worker's usage is measured directly rather than
-inferred from a session aggregate, and worker tokens are never double-counted against the
-coordinator. The helper needs only the agent ID that the Agent tool returned; it finds the
-file itself.
+With Agent Teams enabled, a named worker instead runs as its own session and writes an ordinary
+top-level transcript, identified inside the file by `agentName` and `teamName`. The helper
+resolves both layouts from whatever the Agent tool returned — a bare agent id for a subagent, or
+`<agentName>@<teamName>` for a teammate — by matching the labels recorded in the file rather than
+guessing from timestamps.
+
+Either way a worker's usage is measured directly rather than inferred from a session aggregate,
+and worker tokens are never double-counted against the coordinator. The helper needs only the id
+the Agent tool returned; it finds the file itself. `--transcript PATH` overrides discovery.
 
 Every assistant record carries its own `message.usage` counters, the exact `message.model`
 that served it, and the `effort` used for that turn. That means the ledger records what

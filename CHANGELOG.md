@@ -23,6 +23,12 @@
 - Optional file installer with copy, symlink, verification, conflict backups, and rollback;
   it writes no configuration.
 - Public installation, usage, role-design, accounting, and release documentation.
+- Supports both dispatch modes: Agent Teams teammates (reusable via `SendMessage`, resolved by
+  the `agentName`/`teamName` recorded in their own session transcript) and plain in-process
+  subagents, with the workflow adapting and reporting when reuse is unavailable.
+- Coordinator requirement stated as capability rather than a specific model.
+- Guards against acceptance checks that silently verify nothing, and requires workers to report
+  the literal command and its real output rather than prose shaped like runner output.
 - Windows/macOS/Linux CI matrix for Python 3.11 and 3.13.
 
 ### Codex

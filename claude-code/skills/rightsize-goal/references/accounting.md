@@ -4,7 +4,9 @@ The coordinator runs `scripts/task_usage.py` relative to the installed skill. Py
 
 ## What the helper reads
 
-Claude Code writes one JSONL transcript per session under `<claude-dir>/projects/<project-slug>/<session-id>.jsonl`, and one per subagent under `<claude-dir>/projects/<project-slug>/<session-id>/subagents/agent-<agent-id>.jsonl`. Every assistant record in those files carries its own `message.usage` counters, the exact `message.model` that served it, and the `effort` used for that turn. Because each subagent gets its own file, a worker's usage is measured directly rather than inferred from a session aggregate, and worker tokens are never double-counted against the coordinator.
+Claude Code writes one JSONL transcript per session under `<claude-dir>/projects/<project-slug>/<session-id>.jsonl`, and one per in-process subagent under `<claude-dir>/projects/<project-slug>/<session-id>/subagents/agent-<agent-id>.jsonl`. Every assistant record in those files carries its own `message.usage` counters, the exact `message.model` that served it, and the `effort` used for that turn.
+
+A named worker dispatched with Agent Teams enabled is not a subagent. It runs as its own session and writes an ordinary top-level transcript, identified inside the file by `agentName` and `teamName` rather than by an `agentId` in the filename. The Agent tool returns `<agentName>@<teamName>`; pass that string as `--agent-id` and the helper resolves either layout automatically, matching those recorded labels rather than guessing from timestamps. Pass `--transcript PATH` if discovery ever fails. Because each subagent gets its own file, a worker's usage is measured directly rather than inferred from a session aggregate, and worker tokens are never double-counted against the coordinator.
 
 The helper reads only those metadata fields. It ignores every other line, so prompts, responses, tool arguments, and file contents are never parsed into the ledger.
 

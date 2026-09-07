@@ -17,6 +17,9 @@ and an installer. It uses your existing Claude Code account and permissions.
   a model you cannot use will fail at dispatch. See [checking model access](#check-model-access).
 - Python 3.11 or newer, for the two helper scripts. No third-party packages.
 - A trusted workspace, if you want `/goal` to hold the session open.
+- Optionally `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`. Recommended, not required: it lets the
+  coordinator reuse a warm worker across related assignments instead of rebuilding its context
+  each time. Everything works without it. See [Agent Teams](docs/install.md#agent-teams-recommended).
 
 ## Install
 
@@ -113,7 +116,9 @@ The examples below use the plugin form. Substitute the bare form for a manual in
 arguments are identical either way, and autocomplete after `/rightsize` shows whichever one
 is live.
 
-Select Opus with `medium` effort for the root session, then invoke the skill:
+The coordinator needs enough judgment to route and verify, not a specific model. Opus at
+`medium` and Sonnet 5 at `high` are both good choices; Haiku is not suitable for this role.
+Set it for the session, then invoke the skill:
 
 ```text
 /model opus
