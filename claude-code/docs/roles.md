@@ -41,15 +41,15 @@ it is a reason to route by task fit and measure the outcome.
 **Effort.** Sonnet 5, Opus 5, and Fable 5.1 accept `low` through `max`, and effort changes
 how many tokens a model spends at a fixed rate. Claude Code's session default is `xhigh`; the
 API default is `high`. Every effort-bearing role here runs at or below `high`, and each paid
-model tier is split into a cheaper and a dearer variant on effort alone. Choosing
+model tier is split into a lower-effort and a higher-effort variant, which changes token volume rather than rate. Choosing
 `rightsize-lower-senior-doer` over `rightsize-senior-doer` is a genuine cost decision even
 though both are Opus 5.
 
 The levels are not arbitrary. Anthropic's own guidance sets the API default at `high` for both
 Sonnet 5 and Opus 5, reserves `xhigh` for "the hardest coding and agentic tasks", and calls
 `low`/`medium` the primary cost lever — on Opus 5 explicitly: *"`low` and `medium` are unusually
-effective on this model."* So the cheaper half of each pair sits at `medium`, and the dearer
-half sits at the documented default rather than above it. `xhigh` and `max` are left unused:
+effective on this model."* So the lower-effort half of each pair sits at `medium`, and the
+higher-effort half sits at the documented default rather than above it. `xhigh` and `max` are left unused:
 this workflow is meant to spend less than a default session, not more, and an `xhigh` role also
 wants a large `max_tokens` that agent frontmatter cannot set.
 
@@ -107,12 +107,14 @@ The obvious reductions were considered and rejected:
 - **Drop `rightsize-upper-midlevel-doer`.** Then moderate-complexity work has nowhere to
   go but Opus, and the largest single price step in the ladder gets taken for work that
   did not need it.
-- **Drop `rightsize-staff-doer`.** Then every Fable escalation is a principal-level
-  purchase. The staff role exists precisely so the first probe into the most expensive
-  model is the cheaper of the two, and so staff cannot become a compulsory toll before
-  principal.
-- **Drop one of the Opus pair.** Opus is where hard work actually lands. Having a cheaper
-  default and a deeper variant on the same model is the most-used step on the ladder.
+- **Drop `rightsize-staff-doer`.** Then every Fable escalation runs at principal depth.
+  Both Fable roles bill at the same rate, so staff does not make escalation cheap — nothing
+  at this tier is cheap. It makes the first probe *smaller*: less effort spent testing
+  whether Fable's different framing resolves the question, before committing to a deeper
+  run. It also stops staff becoming a compulsory toll before principal.
+- **Drop one of the Opus pair.** Opus is where hard work actually lands. Having a
+  lower-effort default and a deeper variant on the same model is the most-used step on the
+  ladder.
 
 ## Why not more
 
@@ -120,7 +122,7 @@ Sonnet 5, Opus 5, and Fable 5.1 each support five effort levels, so a finer ladd
 technically possible. It is not obviously better. Each additional role is a routing
 decision the coordinator has to make and justify in the log, and adjacent effort levels on
 the same model rarely change the right answer. Seven roles already give every model tier
-except Haiku both a cheap and an expensive variant. Adding an eighth would buy resolution
+except Haiku both a lower-effort and a higher-effort variant. Adding an eighth would buy resolution
 the evidence cannot yet support.
 
 ## What every role can and cannot do
