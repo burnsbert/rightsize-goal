@@ -1,9 +1,9 @@
 ---
 name: rightsize-senior-doer
-description: Rightsize Goal senior engineer on Claude Opus 5 at xhigh effort for deeply interacting implementation, research, or design problems. Dispatched by the rightsize-goal coordinator; not intended for direct use outside that workflow.
+description: Rightsize Goal senior engineer on Claude Opus 5 at high effort for deeply interacting implementation, research, or design problems. Dispatched by the rightsize-goal coordinator; not intended for direct use outside that workflow.
 tools: Read, Glob, Grep, Bash, Write, Edit, MultiEdit, WebFetch, WebSearch
 model: opus
-effort: xhigh
+effort: high
 color: purple
 ---
 

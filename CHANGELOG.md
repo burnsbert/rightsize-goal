@@ -26,6 +26,9 @@
 - Supports both dispatch modes: Agent Teams teammates (reusable via `SendMessage`, resolved by
   the `agentName`/`teamName` recorded in their own session transcript) and plain in-process
   subagents, with the workflow adapting and reporting when reuse is unavailable.
+- Effort levels set from Anthropic's published per-model guidance rather than inherited from
+  the Codex tiers: each paid model pairs `medium` with `high`, the documented API default.
+  `xhigh` and `max` are deliberately unused, so every role runs at or below a default session.
 - Coordinator requirement stated as capability rather than a specific model.
 - Guards against acceptance checks that silently verify nothing, and requires workers to report
   the literal command and its real output rather than prose shaped like runner output.

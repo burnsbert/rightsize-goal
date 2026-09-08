@@ -11,11 +11,11 @@ be argued with rather than merely inherited.
 | --- | --- | --- | --- |
 | `rightsize-junior-doer` | Claude Haiku 4.5 | not supported | Explicit, low-risk work with an example or prescribed approach |
 | `rightsize-midlevel-doer` | Claude Sonnet 5 | `medium` | Bounded work using established project patterns |
-| `rightsize-upper-midlevel-doer` | Claude Sonnet 5 | `xhigh` | Moderately complex bounded work needing more judgment |
+| `rightsize-upper-midlevel-doer` | Claude Sonnet 5 | `high` | Moderately complex bounded work needing more judgment |
 | `rightsize-lower-senior-doer` | Claude Opus 5 | `medium` | Hard work: ambiguity, unfamiliar integrations, real tradeoffs |
-| `rightsize-senior-doer` | Claude Opus 5 | `xhigh` | Deep interacting constraints where more effort pays off |
-| `rightsize-staff-doer` | Claude Fable 5.1 | `low` | Bounded expert work, only after documented Opus struggle |
-| `rightsize-principal-doer` | Claude Fable 5.1 | `medium` | The hardest unresolved core, only after documented Opus struggle |
+| `rightsize-senior-doer` | Claude Opus 5 | `high` | Deep interacting constraints where more effort pays off |
+| `rightsize-staff-doer` | Claude Fable 5.1 | `medium` | Bounded expert work, only after documented Opus struggle |
+| `rightsize-principal-doer` | Claude Fable 5.1 | `high` | The hardest unresolved core, only after documented Opus struggle |
 
 Each row is a distinct `(model, effort)` pair. No two roles resolve to the same
 configuration, which is the bar a role has to clear to justify existing.
@@ -39,11 +39,23 @@ a single rework cycle can erase it. The ladder is not a licence to route everyth
 it is a reason to route by task fit and measure the outcome.
 
 **Effort.** Sonnet 5, Opus 5, and Fable 5.1 accept `low` through `max`, and effort changes
-how many tokens a model spends at a fixed rate. Claude Code's session default is `xhigh`.
-Six of the seven roles deliberately run at or below that default, and two model tiers are
-split into a cheap and an expensive variant on effort alone. Choosing
+how many tokens a model spends at a fixed rate. Claude Code's session default is `xhigh`; the
+API default is `high`. Every effort-bearing role here runs at or below `high`, and each paid
+model tier is split into a cheaper and a dearer variant on effort alone. Choosing
 `rightsize-lower-senior-doer` over `rightsize-senior-doer` is a genuine cost decision even
 though both are Opus 5.
+
+The levels are not arbitrary. Anthropic's own guidance sets the API default at `high` for both
+Sonnet 5 and Opus 5, reserves `xhigh` for "the hardest coding and agentic tasks", and calls
+`low`/`medium` the primary cost lever — on Opus 5 explicitly: *"`low` and `medium` are unusually
+effective on this model."* So the cheaper half of each pair sits at `medium`, and the dearer
+half sits at the documented default rather than above it. `xhigh` and `max` are left unused:
+this workflow is meant to spend less than a default session, not more, and an `xhigh` role also
+wants a large `max_tokens` that agent frontmatter cannot set.
+
+On Fable 5.1 the same guidance recommends `high` for most tasks and `medium`/`low` for routine
+work. Since the two Fable roles fire only after documented Opus struggle — by definition the
+least routine work the workflow sees — they sit at `medium` and `high`, not in the routine band.
 
 This is why the roles ship as files. The Agent tool can override a subagent's `model` at
 dispatch, but it cannot override `effort`. Only a role definition can pin both, so a

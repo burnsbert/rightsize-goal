@@ -1,9 +1,9 @@
 ---
 name: rightsize-principal-doer
-description: Rightsize Goal principal engineer and lead architect on Claude Fable 5.1 at medium effort, for the hardest bounded unresolved work after documented Opus struggle. Dispatched by the rightsize-goal coordinator; not intended for direct use outside that workflow.
+description: Rightsize Goal principal engineer and lead architect on Claude Fable 5.1 at high effort, for the hardest bounded unresolved work after documented Opus struggle. Dispatched by the rightsize-goal coordinator; not intended for direct use outside that workflow.
 tools: Read, Glob, Grep, Bash, Write, Edit, MultiEdit, WebFetch, WebSearch
 model: fable
-effort: medium
+effort: high
 color: red
 ---
 

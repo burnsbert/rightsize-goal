@@ -158,11 +158,11 @@ See [usage examples, stop and resume, and limitations](docs/usage.md).
 | --- | --- | --- |
 | Junior | Haiku 4.5 | Very basic explicit work |
 | Lower-midlevel | Sonnet 5 / medium | Routine bounded work using established patterns |
-| Upper-midlevel | Sonnet 5 / xhigh | Moderately complex bounded work |
+| Upper-midlevel | Sonnet 5 / high | Moderately complex bounded work |
 | Lower-senior | Opus 5 / medium | Hard implementation, research, and brainstorming |
-| Senior | Opus 5 / xhigh | Deep interacting constraints and difficult reasoning |
-| Staff | Fable 5.1 / low | Bounded expert work after documented Opus struggle |
-| Principal | Fable 5.1 / medium | Hardest bounded work after documented Opus struggle |
+| Senior | Opus 5 / high | Deep interacting constraints and difficult reasoning |
+| Staff | Fable 5.1 / medium | Bounded expert work after documented Opus struggle |
+| Principal | Fable 5.1 / high | Hardest bounded work after documented Opus struggle |
 
 Haiku 4.5 does not take an effort setting, so the junior role pins the model only. Every
 other role pins both, and the Agent tool has no dispatch-time effort override, which is
