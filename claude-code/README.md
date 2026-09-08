@@ -6,7 +6,7 @@ records usage and lessons. It seeks lower total cost including rework; savings a
 guaranteed. It is useful for multi-step implementation and investigation; trivial edits
 usually do not warrant the coordination overhead.
 
-This package ships one skill, seven subagent roles, two standard-library Python helpers,
+This package ships one skill, four subagent roles, two standard-library Python helpers,
 and an installer. It uses your existing Claude Code account and permissions.
 
 ## Requirements
@@ -40,7 +40,7 @@ claude plugin install rightsize-goal@rightsize-goal
 That is the whole installation. Nothing is copied into your configuration by hand,
 `/plugin update` handles upgrades, and `/plugin uninstall rightsize-goal` removes it.
 Confirm what landed with `claude plugin details rightsize-goal`, which lists one skill,
-seven agents, and the plugin's token cost.
+four agents, and the plugin's token cost.
 
 Under a plugin install the roles are addressed with the plugin prefix, for example
 `rightsize-goal:rightsize-junior-doer`. The skill resolves this itself at run time.
@@ -66,7 +66,7 @@ python .\claude-code\install.py
 python .\claude-code\install.py --verify
 ```
 
-This copies the skill to `~/.claude/skills/rightsize-goal` and the seven role files to
+This copies the skill to `~/.claude/skills/rightsize-goal` and the four role files to
 `~/.claude/agents/`. It writes no settings and changes no existing configuration. Roles
 installed this way are addressed by their bare names, without a prefix.
 
@@ -96,7 +96,7 @@ claude --model sonnet -p 'Reply with exactly: OK'
 claude --model haiku  -p 'Reply with exactly: OK'
 ```
 
-If Fable is unavailable, the staff and principal roles will fail at dispatch. The skill
+If Fable is unavailable, the principal role will fail at dispatch. The skill
 is instructed to disclose that, treat the highest available tier as the top of the
 ladder, and say in its final report that escalation was capped. Never edit a role to
 point at a different model without also updating
@@ -157,16 +157,13 @@ See [usage examples, stop and resume, and limitations](docs/usage.md).
 | Role | Model / effort | Intended scope |
 | --- | --- | --- |
 | Junior | Haiku 4.5 | Very basic explicit work |
-| Lower-midlevel | Sonnet 5 / medium | Routine bounded work using established patterns |
-| Upper-midlevel | Sonnet 5 / high | Moderately complex bounded work |
-| Lower-senior | Opus 5 / medium | Hard implementation, research, and brainstorming |
-| Senior | Opus 5 / high | Deep interacting constraints and difficult reasoning |
-| Staff | Fable 5.1 / medium | Bounded expert work after documented Opus struggle |
+| Midlevel | Sonnet 5 / high | Bounded work using established patterns, including moderately complex work needing more judgment |
+| Senior | Opus 5 / high | Hard implementation, research, brainstorming, and deep interacting constraints |
 | Principal | Fable 5.1 / high | Hardest bounded work after documented Opus struggle |
 
 Haiku 4.5 does not take an effort setting, so the junior role pins the model only. Every
 other role pins both, and the Agent tool has no dispatch-time effort override, which is
-why the roles exist as files rather than as instructions. [Why these seven](docs/roles.md)
+why the roles exist as files rather than as instructions. [Why these four](docs/roles.md)
 explains the boundaries, what each role can and cannot touch, and how to change them.
 
 Project activity is logged under `.rightsize-goal/` in the target project. Cross-project

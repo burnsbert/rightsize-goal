@@ -6,8 +6,11 @@
 
 - New `claude-code/` implementation, distributed as a Claude Code plugin with a repository
   marketplace manifest; two commands install it and `/plugin update` maintains it.
-- Seven subagent roles across Claude Haiku 4.5, Sonnet 5, Opus 5, and Fable 5.1, each
-  pinning model and effort, since the Agent tool has no dispatch-time effort override.
+- Four subagent roles across Claude Haiku 4.5, Sonnet 5, Opus 5, and Fable 5.1 (one role per
+  model, each paid role at `high` effort), each pinning model and effort, since the Agent
+  tool has no dispatch-time effort override. Simplified before first release from an
+  earlier seven-role ladder (a `medium`- and a `high`-effort variant of each paid model);
+  see [why these four roles](claude-code/docs/roles.md#why-four-roles).
 - Roles are denied agent-spawning tools, so the escalation gate cannot be bypassed by a
   worker escalating itself; a packaged test asserts this.
 - Skill resolves plugin-prefixed and bare role names at run time, and refuses to substitute
@@ -27,8 +30,8 @@
   the `agentName`/`teamName` recorded in their own session transcript) and plain in-process
   subagents, with the workflow adapting and reporting when reuse is unavailable.
 - Effort levels set from Anthropic's published per-model guidance rather than inherited from
-  the Codex tiers: each paid model pairs `medium` with `high`, the documented API default.
-  `xhigh` and `max` are deliberately unused, so every role runs at or below a default session.
+  the Codex tiers: each paid model runs at `high`, the documented API default. `xhigh` and
+  `max` are deliberately unused, so every role runs at, not above, a default session.
 - Fable escalation evidence comes from a dispatched Opus-tier child whose documented struggle
   the coordinator relays and judges, rather than from the coordinator's own work. A cheaper
   tier's failure remains insufficient however it is relayed.
@@ -36,6 +39,13 @@
 - Guards against acceptance checks that silently verify nothing, and requires workers to report
   the literal command and its real output rather than prose shaped like runner output.
 - Windows/macOS/Linux CI matrix for Python 3.11 and 3.13.
+- **Known issue (Claude Code only):** a Claude Code bug
+  ([anthropics/claude-code#80569](https://github.com/anthropics/claude-code/issues/80569))
+  makes an Agent Teams teammate silently inherit the coordinator's own session effort instead
+  of its role's pinned `effort`; `model` crosses over correctly. Effort is honored on the
+  plain in-process subagent path. Documented in
+  [Agent Teams](claude-code/docs/install.md#agent-teams-recommended). No equivalent in the
+  Codex implementation, which has no teammate dispatch mode.
 
 ### Codex
 

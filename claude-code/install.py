@@ -25,10 +25,7 @@ if sys.version_info < (3, 11):
 ROLES = (
     "rightsize-junior-doer",
     "rightsize-midlevel-doer",
-    "rightsize-upper-midlevel-doer",
-    "rightsize-lower-senior-doer",
     "rightsize-senior-doer",
-    "rightsize-staff-doer",
     "rightsize-principal-doer",
 )
 

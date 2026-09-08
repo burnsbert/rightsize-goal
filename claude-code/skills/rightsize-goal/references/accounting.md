@@ -31,7 +31,7 @@ Typical commands (replace placeholders; `--db` and `--claude-dir` are optional a
 ```text
 python3 <skill-dir>/scripts/task_usage.py report
 python3 <skill-dir>/scripts/task_usage.py start --run <run-id> --task T001 --project-tag <project> \
-  --role rightsize-midlevel-doer --model claude-sonnet-5 --effort medium --mode implement \
+  --role rightsize-midlevel-doer --model claude-sonnet-5 --effort high --mode implement \
   --difficulty routine --agent-id <exact-agent-id> --new-agent --tariff <skill-dir>/references/tariff.json
 python3 <skill-dir>/scripts/task_usage.py finish --run <run-id> --task T001 --outcome accepted \
   --evidence "tests passed; scratch T001" --lesson "Established parser change accepted without rework"

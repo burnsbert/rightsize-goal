@@ -1,5 +1,17 @@
 # Claude Code release checks
 
+## Role ladder changed since this review — re-verify before tagging
+
+On September 8, 2026, the role ladder was simplified from seven roles (a `medium`- and a
+`high`-effort variant of each paid model) to four (one role per model, each at `high`); see
+[why these four roles](roles.md#why-four-roles). The live verification below predates that
+change and was performed against the seven-role ladder. Its structural claims (install,
+manifests, escalation gate, accounting, installer behavior) are unaffected, but the
+per-role dispatch results naming `midlevel`/`medium`, `upper-midlevel`, `lower-senior`, and
+`staff` describe roles that no longer exist. Re-run the live dispatch check against the
+current four roles before tagging; do not treat the counts and per-role results below as
+current.
+
 ## Review status: September 7, 2026
 
 This is the first release of the Claude Code package. It was written against Claude Code
@@ -109,9 +121,9 @@ at the same role. Dispatch overhead, not model rate, dominates the cost of small
 - Observe the complete CI matrix passing, including symlink coverage on a host that permits
   symlinks. Exercise the public shell and PowerShell entry points.
 - Install the plugin from the published GitHub source, not only from a local path, and
-  confirm `claude plugin details rightsize-goal` lists one skill and seven agents.
+  confirm `claude plugin details rightsize-goal` lists one skill and four agents.
 - Install from a clean source archive with `install.py` and confirm `--verify` passes.
-- Start a fresh session and confirm the skill and all seven roles load under both install
+- Start a fresh session and confirm the skill and all four roles load under both install
   methods, including the `rightsize-goal:` prefix under the plugin.
 - Run a small goal in a disposable project. Confirm suitable delegation, verified
   acceptance, a saved log and gate, and honest usage results — available, or an explained
@@ -123,7 +135,7 @@ at the same role. Dispatch overhead, not model rate, dominates the cost of small
   the tariff version when rates change; do not rewrite historical ledger snapshots.
 - Confirm `role_models` in the tariff still matches every role file's `model` alias.
 - Ensure no credentials, local logs, databases, or private backups enter the release.
-- Include the root MIT `LICENSE`, the docs, the skill helpers and references, and all seven
+- Include the root MIT `LICENSE`, the docs, the skill helpers and references, and all four
   roles in any downloadable bundle.
 - Update `CHANGELOG.md`, select a version and tag, bump `version` in both
   `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`, and publish only the

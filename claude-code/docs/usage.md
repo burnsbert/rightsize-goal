@@ -139,7 +139,7 @@ The gate helper has no command to edit existing bounds automatically.
 - More agents can increase token consumption. The policy seeks lower total cost including
   rework; it does not establish guaranteed savings, and the Claude price ladder is flat
   enough that one rework cycle can erase a tier's savings. See
-  [why these seven roles](roles.md#two-levers-not-one).
+  [why these four roles](roles.md#two-levers-not-one).
 - Dollar figures are API-equivalent estimates. A Claude Code subscription is not billed per
   token, so the numbers are a routing comparison basis and not your bill.
 - Permissions remain those of the host and your request. A persistent goal does not

@@ -12,7 +12,7 @@
 | Role names | `rightsize-goal:rightsize-...` | `rightsize-...` |
 | Custom config directory | follows `CLAUDE_CONFIG_DIR` | `--claude-dir PATH` |
 
-Both install the same skill and the same seven roles. The helper scripts need Python 3.11+
+Both install the same skill and the same four roles. The helper scripts need Python 3.11+
 at run time either way; the plugin route just does not need it to install.
 
 ## Plugin installation
@@ -33,7 +33,7 @@ claude plugin marketplace add ./rightsize-goal
 ```
 
 Check the result with `claude plugin details rightsize-goal`. It should report one skill
-and seven agents. `claude plugin list` shows what is installed, and the `/plugin` **Errors**
+and four agents. `claude plugin list` shows what is installed, and the `/plugin` **Errors**
 tab surfaces loading problems.
 
 `--scope user` is the default. Use `--scope project` to install for one repository, which
@@ -115,10 +115,21 @@ accounting are all unaffected. The one thing you lose is reuse: a follow-up need
 that must be given its context again. The skill detects which mode is live, adapts, and says in
 its final report when reuse was unavailable.
 
+**Known Claude Code bug: teammates ignore a role's `effort` frontmatter.** With Agent Teams
+on, a dispatched teammate silently inherits the coordinator's own session effort instead of
+the role definition's pinned `effort` — the `model` field crosses over correctly, but `effort`
+does not, with no warning. This is a genuine gap in Claude Code, tracked upstream as
+[anthropics/claude-code#80569](https://github.com/anthropics/claude-code/issues/80569); it does
+not affect this package's Codex implementation, which has no equivalent teammate dispatch mode.
+The unaffected path is a plain in-process subagent (Agent Teams off, or a coordinator that omits
+the worker's name), where `effort` frontmatter is honored. Until the upstream bug is fixed, treat
+a role's declared effort as reliable only on that path, and check `/tasks` while a worker is
+active to see the effort it actually ran at.
+
 A teammate is a whole session rather than a lightweight helper, so it loads its own project
 instructions and orients itself before touching the work you assigned. Its floor cost per
 dispatch is therefore several times a plain subagent's — see
-[why these seven roles](roles.md#what-a-dispatch-actually-costs) for measured figures. Bundle
+[why these four roles](roles.md#what-a-dispatch-actually-costs) for measured figures. Bundle
 related work into one assignment rather than spawning a teammate for something smaller than its
 own startup cost.
 
@@ -156,16 +167,13 @@ not appear.
 Plugin: `/plugin uninstall rightsize-goal`, then
 `/plugin marketplace remove rightsize-goal` if you no longer want the marketplace entry.
 
-Manual install: remove `rightsize-goal` from the installed skills directory and these seven
+Manual install: remove `rightsize-goal` from the installed skills directory and these four
 files from the installed agents directory.
 
 ```text
 rightsize-junior-doer.md
 rightsize-midlevel-doer.md
-rightsize-upper-midlevel-doer.md
-rightsize-lower-senior-doer.md
 rightsize-senior-doer.md
-rightsize-staff-doer.md
 rightsize-principal-doer.md
 ```
 
@@ -179,7 +187,7 @@ records. Delete those separately only if you want to discard that history.
 
 - **Skill or roles missing.** Run `claude plugin details rightsize-goal` for a plugin
   install, or `install.py --verify` for a manual one. Check `/plugin` → Errors. Start a
-  fresh session. Installing only the skill with a generic skill installer omits the seven
+  fresh session. Installing only the skill with a generic skill installer omits the four
   roles, and the workflow will refuse to substitute a default agent for them.
 - **"Agent type not found".** Under a plugin install the roles need the
   `rightsize-goal:` prefix. Read the available-agents list and use the exact string.
@@ -190,7 +198,7 @@ records. Delete those separately only if you want to discard that history.
 - **Model unavailable.** Check `/model`, or probe with
   `claude --model fable -p 'Reply with exactly: OK'`. Installing a role does not grant
   access. Do not silently repoint a role at a different model: see
-  [why these seven roles](roles.md#changing-the-ladder) for the three files that must stay
+  [why these four roles](roles.md#changing-the-ladder) for the three files that must stay
   consistent.
 - **`/goal` refuses to run.** It needs a trusted workspace and unrestricted hooks. Work can
   still proceed without it; only the automatic hold on session stop is lost.

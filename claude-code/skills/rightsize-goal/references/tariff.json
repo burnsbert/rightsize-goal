@@ -26,10 +26,7 @@
   "role_models": {
     "rightsize-junior-doer": "claude-haiku-4-5",
     "rightsize-midlevel-doer": "claude-sonnet-5",
-    "rightsize-upper-midlevel-doer": "claude-sonnet-5",
-    "rightsize-lower-senior-doer": "claude-opus-5",
     "rightsize-senior-doer": "claude-opus-5",
-    "rightsize-staff-doer": "claude-fable-5-1",
     "rightsize-principal-doer": "claude-fable-5-1"
   }
 }
