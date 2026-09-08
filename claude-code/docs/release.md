@@ -13,10 +13,18 @@ rather than assumed. Do not describe this review as a guarantee of error-free be
 - A full plugin install from a local path (`marketplace add ./`, `plugin install
   rightsize-goal@rightsize-goal`) succeeded into an isolated `CLAUDE_CONFIG_DIR`, and
   `claude plugin details` reported one skill and all seven agents.
-- Subagent `effort` frontmatter takes effect. A dispatched `rightsize-midlevel-doer` was
-  recorded as `claude-sonnet-5` at effort `medium`, against a session default of `xhigh`.
-- Claude Haiku 4.5 records no `effort` value at all, which is why the junior role pins the
-  model only.
+- **All seven roles were dispatched and their transcripts checked.** Every one recorded the
+  model and effort its definition pins, against a session default of `xhigh`:
+  junior `claude-haiku-4-5-20251001` with no effort value at all (which is why that role pins
+  the model only), midlevel `claude-sonnet-5`/`medium`, upper-midlevel `claude-sonnet-5`/`high`,
+  lower-senior `claude-opus-5`/`medium`, senior `claude-opus-5`/`high`, staff
+  `claude-fable-5-1`/`medium`, principal `claude-fable-5-1`/`high`. Subagent `effort`
+  frontmatter therefore takes effect, and the ladder is what the documentation claims.
+- **The Fable escalation gate holds.** Both Fable roles were sent a deliberately unrouted
+  assignment — an open-ended question with no prior attempts and no bounded deliverable. Both
+  returned `needs-routing-evidence` without starting an investigation, itemised what was
+  missing, and named a cheaper tier for the first pass. This is the workflow's most
+  cost-consequential rule and the only one whose failure is expensive by construction.
 - Plugin-installed roles are addressed as `rightsize-goal:<role>`; bare names fail with
   "Agent type not found". The skill resolves the prefix at run time.
 - Claude Fable 5.1 was reachable on the test account, resolving from the `fable` alias to
@@ -87,7 +95,8 @@ at the same role. Dispatch overhead, not model rate, dominates the cost of small
 ### Not covered by any automated test
 
 - Model entitlement on any account other than the one used above.
-- The quality of delegation, escalation, or acceptance judgment.
+- The quality of delegation and acceptance judgment. The escalation gate's *refusal*
+  behaviour is verified above; whether the coordinator routes well across a real goal is not.
 - `/goal` behavior, which needs a trusted workspace and interactive approval.
 - Windows and Linux behavior. The CI matrix covers them; those results have not been
   observed in this local review.
