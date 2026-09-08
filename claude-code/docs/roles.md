@@ -109,7 +109,8 @@ The obvious reductions were considered and rejected:
   did not need it.
 - **Drop `rightsize-staff-doer`.** Then every Fable escalation is a principal-level
   purchase. The staff role exists precisely so the first probe into the most expensive
-  model is a cheap one, and so staff cannot become a compulsory toll before principal.
+  model is the cheaper of the two, and so staff cannot become a compulsory toll before
+  principal.
 - **Drop one of the Opus pair.** Opus is where hard work actually lands. Having a cheaper
   default and a deeper variant on the same model is the most-used step on the ladder.
 

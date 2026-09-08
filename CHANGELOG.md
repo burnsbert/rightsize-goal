@@ -29,6 +29,9 @@
 - Effort levels set from Anthropic's published per-model guidance rather than inherited from
   the Codex tiers: each paid model pairs `medium` with `high`, the documented API default.
   `xhigh` and `max` are deliberately unused, so every role runs at or below a default session.
+- Fable escalation evidence comes from a dispatched Opus-tier child whose documented struggle
+  the coordinator relays and judges, rather than from the coordinator's own work. A cheaper
+  tier's failure remains insufficient however it is relayed.
 - Coordinator requirement stated as capability rather than a specific model.
 - Guards against acceptance checks that silently verify nothing, and requires workers to report
   the literal command and its real output rather than prose shaped like runner output.
