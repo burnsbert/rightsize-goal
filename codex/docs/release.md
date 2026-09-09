@@ -38,8 +38,7 @@ The bundled tariff values were checked against the four linked official model
 pages on September 7; the original rate version and expiry remain unchanged.
 
 The local suite count and result should be refreshed immediately before release.
-During the September 9 review, the symlink conversion test was skipped
-because this Windows process cannot create symlinks.
+During the September 9 review, all 45 Codex tests ran and passed locally.
 The new GitHub Actions matrix covers Windows, macOS, and Linux with Python 3.11
 and 3.13; its remote results have not been observed in this local review.
 

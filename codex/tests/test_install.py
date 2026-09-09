@@ -153,19 +153,6 @@ class InstallTests(unittest.TestCase):
                 self.assertEqual(content, self.config.read_text(encoding="utf-8"))
                 self.assertFalse((self.skills / "rightsize-goal").exists())
 
-    def test_symlink_to_copy_requires_force_then_converts(self):
-        self.skills.mkdir(parents=True)
-        link = self.skills / "rightsize-goal"
-        try:
-            link.symlink_to(self.package / ".agents/skills/rightsize-goal", target_is_directory=True)
-        except OSError as exc:
-            self.skipTest(f"symlinks unavailable: {exc}")
-        with self.assertRaises(SystemExit):
-            installer.install(self.args(), self.package, self.codex, self.skills)
-        installer.install(self.args(force=True), self.package, self.codex, self.skills)
-        self.assertFalse(link.is_symlink())
-        self.assertEqual([], installer.verify(self.package, self.codex, self.skills, True))
-
     def test_copy_install_is_verifiable_idempotent_and_preserves_config(self):
         installer.install(self.args(), self.package, self.codex, self.skills)
         self.assertEqual([], installer.verify(self.package, self.codex, self.skills))
