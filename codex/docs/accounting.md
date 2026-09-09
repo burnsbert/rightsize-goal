@@ -41,6 +41,11 @@ and any work outside the assignment protocol.
 Reports group observations by actual model/effort, task mode, difficulty, and
 tariff version. Sample counts, acceptance, rework, failures, and coverage should
 be read together. Comparing unlike tasks is not proof of savings or capability.
+The `chain_groups` section also joins retries and escalations through `prior_task`
+and groups their complete cost by the initially requested model/effort route and
+tariff-version combination. A chain cost is complete only
+when every linked assignment has known cost. `partial_chain_links` warns that a
+filter omitted a parent or the recorded links are malformed.
 
 ## Privacy and storage
 

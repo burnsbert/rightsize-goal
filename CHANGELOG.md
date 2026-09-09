@@ -49,7 +49,13 @@
 
 ### Codex
 
-- Codex skill with seven model/effort-specific roles and evidence-based escalation.
+- Codex skill with six model/effort-specific roles and evidence-based escalation.
+- Route known moderate work to Terra/high sooner; allow Luna factual research that
+  has clear sources and no material judgment call.
+- Use the Sol/high staff engineer as the strongest first pass for the most complex
+  work where Astra escalation is most at risk; label Sol/medium senior engineer and
+  consolidate Astra into one medium-effort principal engineer role.
+- Report the complete known cost of linked rework/escalation chains by initial route.
 - Persistent completion gate with time/iteration bounds and saved run state.
 - Local task usage ledger and versioned API-equivalent estimates.
 - Copy installation by default, contributor symlinks, verification, replacement

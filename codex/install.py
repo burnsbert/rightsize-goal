@@ -24,11 +24,12 @@ ROLES = (
     "rightsize-junior-doer",
     "rightsize-midlevel-doer",
     "rightsize-upper-midlevel-doer",
-    "rightsize-lower-senior-doer",
     "rightsize-senior-doer",
     "rightsize-staff-doer",
     "rightsize-principal-doer",
 )
+RETIRED_ROLES = ("rightsize-lower-senior-doer", "rightsize-astra-doer")
+MANAGED_ROLES = ROLES + RETIRED_ROLES
 
 
 def paths(root: Path, codex: Path, skills: Path):
@@ -51,7 +52,7 @@ def same_tree(left: Path, right: Path) -> bool:
 def remove_role_blocks(text: str) -> str:
     role_headers = {
         re.compile(rf'^[ \t]*\[[ \t]*agents[ \t]*\.[ \t]*(?:"{re.escape(role)}"|{re.escape(role)})[ \t]*\][ \t]*(?:#.*)?$')
-        for role in ROLES
+        for role in MANAGED_ROLES
     }
     any_header = re.compile(r"^[ \t]*\[")
     output = []
@@ -68,13 +69,21 @@ def remove_role_blocks(text: str) -> str:
     return "".join(output).rstrip()
 
 
+def configured_roles(text: str, roles: tuple[str, ...]) -> list[str]:
+    headers = {
+        role: re.compile(rf'^[ \t]*\[[ \t]*agents[ \t]*\.[ \t]*(?:"{re.escape(role)}"|{re.escape(role)})[ \t]*\][ \t]*(?:#.*)?$', re.MULTILINE)
+        for role in roles
+    }
+    return [role for role, pattern in headers.items() if pattern.search(text)]
+
+
 def desired_config(text: str, codex: Path, root: Path) -> str:
     original = tomllib.loads(text)
     text = remove_role_blocks(text)
     cleaned = tomllib.loads(text)
     expected = dict(original)
     if isinstance(expected.get("agents"), dict):
-        expected["agents"] = {key: value for key, value in expected["agents"].items() if key not in ROLES}
+        expected["agents"] = {key: value for key, value in expected["agents"].items() if key not in MANAGED_ROLES}
         if not expected["agents"] and "agents" not in cleaned:
             del expected["agents"]
     if cleaned != expected:
@@ -104,6 +113,10 @@ def verify(root: Path, codex: Path, skills: Path, legacy_config: bool = False) -
                 problems.append(f"wrong symlink target: {target}")
         elif not same_tree(source, target):
             problems.append(f"stale copy: {target}")
+    for role in RETIRED_ROLES:
+        target = codex / "agents" / f"{role}.toml"
+        if os.path.lexists(target):
+            problems.append(f"retired agent still installed: {target}")
     if not legacy_config:
         return problems
     config = codex / "config.toml"
@@ -124,6 +137,9 @@ def verify(root: Path, codex: Path, skills: Path, legacy_config: bool = False) -
             actual = codex / actual
         if actual.resolve() != expected:
             problems.append(f"wrong config registration: {role}")
+    for role in RETIRED_ROLES:
+        if role in configured:
+            problems.append(f"retired config registration: {role}")
     return problems
 
 
@@ -154,8 +170,17 @@ def install(args: argparse.Namespace, root: Path, codex: Path, skills: Path) -> 
         old_agents = tomllib.loads(old_text).get("agents", {})
         new_agents = tomllib.loads(new_bytes.decode("utf-8"))["agents"]
         changed_roles = [role for role in ROLES if role in old_agents and old_agents[role] != new_agents[role]]
+        changed_roles.extend(role for role in RETIRED_ROLES if role in old_agents)
         if changed_roles and not args.force:
             raise SystemExit("Existing config registrations conflict: " + ", ".join(changed_roles) + ". Use --force to back up and replace them.")
+    elif old_config:
+        try:
+            config_text = old_config.decode("utf-8-sig").replace("\r\n", "\n").replace("\r", "\n")
+            managed_config = configured_roles(config_text, MANAGED_ROLES)
+        except UnicodeError:
+            managed_config = []
+        if managed_config:
+            raise SystemExit("Existing Rightsize Goal config registrations require migration: " + ", ".join(managed_config) + ". Rerun with --legacy-config --force.")
 
     conflicts = []
     for source, target in pairs:
@@ -166,6 +191,10 @@ def install(args: argparse.Namespace, root: Path, codex: Path, skills: Path) -> 
             current = True
         if not current:
             conflicts.append(target)
+    conflicts.extend(
+        target for target in (codex / "agents" / f"{role}.toml" for role in RETIRED_ROLES)
+        if os.path.lexists(target)
+    )
     if conflicts and not args.force:
         listing = "\n".join(f"  {item}" for item in conflicts)
         raise SystemExit(f"Existing resources conflict:\n{listing}\nRerun with --force to back them up and replace them.")
@@ -180,6 +209,14 @@ def install(args: argparse.Namespace, root: Path, codex: Path, skills: Path) -> 
             backup.mkdir(parents=True, exist_ok=False)
         if config.exists() and new_bytes != old_config:
             shutil.copy2(config, backup / "config.toml")
+        for role in RETIRED_ROLES:
+            target = codex / "agents" / f"{role}.toml"
+            if not os.path.lexists(target):
+                continue
+            destination = backup / "resources" / target.name
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(target, destination)
+            moved.append((target, destination))
         for source, target in pairs:
             if os.path.lexists(target):
                 current = args.method == "symlink" and target.is_symlink() and target.resolve() == source.resolve()

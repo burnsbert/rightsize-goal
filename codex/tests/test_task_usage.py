@@ -180,6 +180,35 @@ class TaskUsageTests(unittest.TestCase):
         self.assertEqual(result["cost_status"], "unavailable")
         self.assertIn("expired", result["cost_reason"])
 
+    def test_report_groups_complete_rework_chain_by_initial_route(self):
+        self.assertEqual(self._start()[0], 0)
+        self._tokens(110, 22, 33, 11)
+        self._call("finish", "--run", "run-1", "--task", "task-1", "--outcome", "rework")
+        self.assertEqual(self._start(task="task-2", prior="task-1")[0], 0)
+        self._tokens(125, 25, 40, 14)
+        self._call("finish", "--run", "run-1", "--task", "task-2", "--outcome", "accepted")
+        report = self._call("report", "--run", "run-1")[1]
+        self.assertEqual(0, report["partial_chain_links"])
+        chain = report["chain_groups"][0]
+        self.assertEqual((1, 1, 1), (chain["chains"], chain["accepted"], chain["with_followup"]))
+        self.assertEqual({"known": 1, "unknown": 0}, chain["complete_cost_coverage"])
+        task_cost = sum(group["cost_total_usd"] for group in report["groups"])
+        self.assertAlmostEqual(task_cost, chain["complete_cost_total_usd"])
+
+    def test_filtered_report_marks_missing_chain_parent(self):
+        self.assertEqual(self._start()[0], 0)
+        self._tokens(110, 22, 33, 11)
+        self._call("finish", "--run", "run-1", "--task", "task-1", "--outcome", "rework")
+        arguments = ["start", "--run", "run-1", "--task", "task-2", "--project-tag", "other",
+                     "--role", "worker", "--model", "model-a", "--effort", "medium", "--mode", "delegated",
+                     "--difficulty", "routine", "--thread-id", "thread-1", "--session", str(self.session),
+                     "--tariff", str(self.tariff), "--prior-task", "task-1"]
+        self.assertEqual(self._call(*arguments)[0], 0)
+        self._tokens(115, 23, 36, 12)
+        self._call("finish", "--run", "run-1", "--task", "task-2", "--outcome", "accepted")
+        report = self._call("report", "--project-tag", "other")[1]
+        self.assertEqual(1, report["partial_chain_links"])
+
 
 if __name__ == "__main__":
     unittest.main()

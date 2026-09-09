@@ -49,7 +49,7 @@ class PackageTests(unittest.TestCase):
         tariff = json.loads((SKILL / "references/tariff.json").read_text(encoding="utf-8"))
         instructions = (SKILL / "SKILL.md").read_text(encoding="utf-8")
         roles = list((PACKAGE / ".codex/agents").glob("*.toml"))
-        self.assertEqual(7, len(roles))
+        self.assertEqual(6, len(roles))
         for path in roles:
             with self.subTest(role=path.name):
                 agent = tomllib.loads(path.read_text(encoding="utf-8"))

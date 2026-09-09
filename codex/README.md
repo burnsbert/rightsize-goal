@@ -6,7 +6,7 @@ and records usage and lessons. It seeks lower total cost including rework; savin
 are not guaranteed. It is useful for multi-step implementation and investigation;
 trivial edits usually do not warrant the coordination overhead.
 
-This package ships one skill, seven custom agents, two standard-library Python
+This package ships one skill, six custom agents, two standard-library Python
 helpers, and installers. It uses your existing Codex account and permissions.
 
 ## Requirements
@@ -14,7 +14,7 @@ helpers, and installers. It uses your existing Codex account and permissions.
 - A local Codex host with custom subagents enabled. Native goal tools are required
   for automatic continuation, but current-session work can use saved scratch state.
 - Python 3.11 or newer.
-- Access to the model names configured by the seven included roles.
+- Access to the model names configured by the six included roles.
 - For optional symlinks on Windows: Developer Mode or appropriate privileges.
 
 ## Install
@@ -38,7 +38,7 @@ sh codex/install.sh --verify
 ```
 
 The default installation copies the skill to `~/.agents/skills/rightsize-goal`
-and the seven agent definitions to `$CODEX_HOME/agents` (normally `~/.codex/agents`).
+and the six agent definitions to `$CODEX_HOME/agents` (normally `~/.codex/agents`).
 It leaves global configuration unchanged. Older hosts needing explicit registrations
 can opt into `--legacy-config`, which backs up changed configuration first.
 
@@ -103,13 +103,17 @@ The coordinator routes work among:
 
 | Role | Configuration | Intended scope |
 | --- | --- | --- |
-| Junior | Luna/high | Very basic explicit work |
-| Lower-midlevel | Luna/xhigh | Routine bounded work using established patterns |
-| Upper-midlevel | Terra/high | Moderately complex bounded work |
-| Lower-senior | Sol/medium | Hard implementation, research, and brainstorming |
-| Senior | Sol/high | Deep interacting constraints and difficult reasoning |
-| Staff | Astra/low | Bounded expert work after documented Sol struggle |
-| Principal | Astra/medium | Hardest bounded work after documented Sol struggle |
+| Junior | Luna/high | Very basic explicit work and factual research without judgment calls |
+| Lower-midlevel | Luna/xhigh | Routine bounded work and evidence gathering using defined criteria |
+| Upper-midlevel | Terra/high | Moderate implementation and research requiring bounded judgment |
+| Senior engineer | Sol/medium | Hard implementation, research, and brainstorming |
+| Staff engineer | Sol/high | Strongest pre-Astra first pass for the most complex and challenging work |
+| Principal engineer | Astra/medium | Bounded unresolved work after documented Sol struggle |
+
+Known moderate work goes directly to Terra rather than using Luna as a cheap trial.
+The most complex work goes directly to Sol/high when Astra escalation is a credible
+risk. Astra has one medium-effort principal engineer role so the escalation receives
+enough reasoning budget without an Astra/low retry.
 
 Project activity is logged under `.rightsize-goal/` in the target project. Cross-project routing history and task usage are stored under `$CODEX_HOME/rightsize-goal/`. The cost figures are standard-rate API-equivalent estimates from a versioned tariff; they are useful for routing comparisons but are not an authoritative subscription bill.
 

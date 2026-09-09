@@ -403,7 +403,57 @@ def report(args: argparse.Namespace) -> dict[str, Any]:
             token_sums["total_tokens"] = token_sums["input_tokens"] + token_sums["output_tokens"]
         latest_lessons = [entry for _, entry in sorted(lessons, key=lambda pair: pair[0])[-5:]]
         output.append({"model": key[0], "effort": key[1], "mode": key[2], "difficulty": key[3], "tariff_version": key[4], "samples": len(items), "active": sum(item["status"] == "active" for item in items), "accepted": outcomes["accepted"], "rework": outcomes["rework"], "failures": outcomes["failed"], "unresolved": outcomes["unresolved"], "cancelled": outcomes["cancelled"], "unknown_outcomes": sum(item["outcome"] is None for item in items), "actual_models": sorted(actual_models), "token_coverage": {"known": known_tokens, "unknown": len(items) - known_tokens}, "token_totals": token_sums if known_tokens else None, "cost_coverage": {"known": len(known_costs), "unknown": len(items) - len(known_costs)}, "cost_total_usd": sum(known_costs) if known_costs else None, "cost_mean_usd": sum(known_costs) / len(known_costs) if known_costs else None, "lessons": latest_lessons})
-    return {"command": "report", "run": args.run, "samples": len(rows), "groups": output, "cost_assumptions": ASSUMPTIONS}
+    # Link retries/escalations to the first assignment so cheap attempts are measured
+    # together with the work needed to reach an accepted result.
+    row_map = {(row["run_id"], row["task_id"]): row for row in rows}
+    chains: dict[tuple[str, str], list[sqlite3.Row]] = defaultdict(list)
+    partial_links = 0
+    for row in rows:
+        current = row
+        seen = {(row["run_id"], row["task_id"])}
+        while current["prior_task"]:
+            parent_key = (current["run_id"], current["prior_task"])
+            parent = row_map.get(parent_key)
+            if parent is None:
+                partial_links += 1
+                break
+            if parent_key in seen:
+                partial_links += 1
+                break
+            seen.add(parent_key)
+            current = parent
+        chains[(current["run_id"], current["task_id"])].append(row)
+
+    chain_groups: dict[tuple[str, str, str, str, tuple[str, ...]], list[dict[str, Any]]] = defaultdict(list)
+    for root_key, items in chains.items():
+        root = row_map[root_key]
+        tariff_versions = tuple(sorted({
+            str(json.loads(item["tariff_json"]).get("version", "unversioned"))
+            if item["tariff_json"] else "none" for item in items
+        }))
+        known_costs = [float(item["cost_usd"]) for item in items if item["cost_status"] == "known"]
+        complete = all(item["status"] == "finished" and item["cost_status"] == "known" for item in items)
+        chain_groups[(root["requested_model"], root["requested_effort"], root["mode"], root["difficulty"], tariff_versions)].append({
+            "accepted": any(item["outcome"] == "accepted" for item in items),
+            "followup": len(items) > 1 or any(item["outcome"] == "rework" for item in items),
+            "complete_cost": sum(known_costs) if complete else None,
+        })
+
+    chain_output = []
+    for key, items in sorted(chain_groups.items()):
+        complete_costs = [item["complete_cost"] for item in items if item["complete_cost"] is not None]
+        chain_output.append({
+            "initial_requested_model": key[0], "initial_requested_effort": key[1],
+            "mode": key[2], "difficulty": key[3], "tariff_versions": list(key[4]),
+            "chains": len(items), "accepted": sum(item["accepted"] for item in items),
+            "with_followup": sum(item["followup"] for item in items),
+            "complete_cost_coverage": {"known": len(complete_costs), "unknown": len(items) - len(complete_costs)},
+            "complete_cost_total_usd": sum(complete_costs) if complete_costs else None,
+            "complete_cost_mean_usd": sum(complete_costs) / len(complete_costs) if complete_costs else None,
+        })
+    return {"command": "report", "run": args.run, "samples": len(rows), "groups": output,
+            "chain_groups": chain_output, "partial_chain_links": partial_links,
+            "cost_assumptions": ASSUMPTIONS}
 
 
 def _parser() -> argparse.ArgumentParser:

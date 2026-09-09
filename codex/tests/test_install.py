@@ -51,6 +51,63 @@ class InstallTests(unittest.TestCase):
         self.assertEqual(original, self.config.read_text(encoding="utf-8"))
         self.assertFalse((self.skills / "rightsize-goal").exists())
 
+    def test_retired_agents_require_force_and_are_backed_up(self):
+        retired = self.codex / "agents" / "rightsize-lower-senior-doer.toml"
+        retired.parent.mkdir(parents=True)
+        retired.write_text("old lower-senior role", encoding="utf-8")
+        with self.assertRaises(SystemExit):
+            installer.install(self.args(legacy_config=False), self.package, self.codex, self.skills)
+        installer.install(self.args(force=True, legacy_config=False), self.package, self.codex, self.skills)
+        self.assertFalse(retired.exists())
+        backups = list((self.codex / "rightsize-goal/install-backups").glob("*/resources/rightsize-lower-senior-doer.toml"))
+        self.assertEqual(1, len(backups))
+        self.assertEqual("old lower-senior role", backups[0].read_text(encoding="utf-8"))
+
+    def test_legacy_upgrade_removes_retired_registrations(self):
+        retired = installer.RETIRED_ROLES[0]
+        self.config.write_text(f'[agents.{retired}]\ndescription = "old"\nconfig_file = "old.toml"\n', encoding="utf-8")
+        installer.install(self.args(force=True), self.package, self.codex, self.skills)
+        configured = tomllib.loads(self.config.read_text(encoding="utf-8"))["agents"]
+        self.assertNotIn(retired, configured)
+        self.assertEqual(set(installer.ROLES), set(configured))
+
+    def test_default_upgrade_does_not_leave_retired_config_dangling(self):
+        retired = installer.RETIRED_ROLES[0]
+        old_file = self.codex / "agents" / f"{retired}.toml"
+        old_file.parent.mkdir(parents=True)
+        old_file.write_text("old role", encoding="utf-8")
+        original = f'[agents."{retired}"]\ndescription = "old"\nconfig_file = "old.toml"\n'
+        self.config.write_text(original, encoding="utf-8")
+        with self.assertRaisesRegex(SystemExit, "require migration"):
+            installer.install(self.args(force=True, legacy_config=False), self.package, self.codex, self.skills)
+        self.assertEqual("old role", old_file.read_text(encoding="utf-8"))
+        self.assertEqual(original, self.config.read_text(encoding="utf-8"))
+        self.assertFalse((self.skills / "rightsize-goal").exists())
+
+    def test_default_upgrade_requires_migration_for_active_legacy_roles(self):
+        role = "rightsize-staff-doer"
+        old_file = self.codex / "agents" / f"{role}.toml"
+        old_file.parent.mkdir(parents=True)
+        old_file.write_text("old Astra staff role", encoding="utf-8")
+        original = f'[agents.{role}]\ndescription = "old Astra staff"\nconfig_file = "agents/{role}.toml"\n'
+        self.config.write_text(original, encoding="utf-8")
+        with self.assertRaisesRegex(SystemExit, "require migration"):
+            installer.install(self.args(force=True, legacy_config=False), self.package, self.codex, self.skills)
+        self.assertEqual("old Astra staff role", old_file.read_text(encoding="utf-8"))
+        self.assertEqual(original, self.config.read_text(encoding="utf-8"))
+
+    def test_forced_upgrade_replaces_old_staff_and_principal_definitions(self):
+        agents = self.codex / "agents"
+        agents.mkdir(parents=True)
+        for role in ("rightsize-staff-doer", "rightsize-principal-doer"):
+            (agents / f"{role}.toml").write_text(f"old {role}", encoding="utf-8")
+        installer.install(self.args(force=True, legacy_config=False), self.package, self.codex, self.skills)
+        for role in ("rightsize-staff-doer", "rightsize-principal-doer"):
+            installed = tomllib.loads((agents / f"{role}.toml").read_text(encoding="utf-8"))
+            self.assertEqual(role, installed["name"])
+            backups = list((self.codex / "rightsize-goal/install-backups").glob(f"*/resources/{role}.toml"))
+            self.assertEqual(1, len(backups))
+
     def test_failure_restores_conflicting_resources(self):
         installer.install(self.args(), self.package, self.codex, self.skills)
         target = self.codex / "agents" / f"{installer.ROLES[0]}.toml"
