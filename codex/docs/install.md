@@ -1,5 +1,27 @@
 # Installation and maintenance
 
+## Choose an install path
+
+For the complete workflow, clone or extract the repository and run
+`python codex/install.py` from the repository root, then
+`python codex/install.py --verify`. This installs the skill and five agents.
+
+Codex's plugin marketplace also offers the Codex skill alone:
+
+```sh
+codex plugin marketplace add burnsbert/rightsize-goal
+codex plugin add rightsize-goal@rightsize-goal
+```
+
+The repo's `.agents/plugins/marketplace.json` points to `./codex`; the separate
+`.claude-plugin/marketplace.json` remains for Claude Code. The plugin cache
+contains the Codex skill and its helper scripts, but Codex plugins cannot yet
+ship the five custom agents. Run the installer for those roles and the full
+workflow. Do not use the plugin route and manual route together: both install
+the skill, and their copies can get out of sync. If you installed the plugin
+first, remove it with `codex plugin remove rightsize-goal@rightsize-goal`
+before using the installer. Start a new Codex session after either install.
+
 ## Requirements and compatibility
 
 Use Python 3.11 or newer. Check with `python --version` (`python3 --version` on

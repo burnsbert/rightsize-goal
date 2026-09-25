@@ -10,6 +10,8 @@ installation, and limitations. Do not assume one host exposes the other's APIs, 
 import across the two directories — a Claude Code plugin is cached on install, so a path
 that leaves `claude-code/` breaks after installation. `goal_gate.py` is host-independent and
 is therefore duplicated in both packages rather than shared; keep the copies in step.
+The Codex plugin also keeps a packaged skill copy under `codex/skills/`; keep it in sync
+with `codex/.agents/skills/`, which is the source used by the manual installer.
 
 Use Python 3.11+; the helpers in both packages use only the standard library. From the root:
 

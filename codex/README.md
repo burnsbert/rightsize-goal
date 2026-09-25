@@ -19,7 +19,8 @@ helpers, and installers. It uses your existing Codex account and permissions.
 
 ## Install
 
-Clone the repository, then run the installer from the clone:
+For the full workflow, clone the repository and run the installer. It installs
+the Codex skill and all five custom agents:
 
 ```powershell
 git clone https://github.com/burnsbert/rightsize-goal.git
@@ -68,9 +69,14 @@ After installing or updating, start a fresh Codex session so the skill and custo
 | Download/extract GitHub source ZIP + copy | Users without Git | Only to verify/update |
 | Clone + `--method symlink` | Contributors | Yes, at the same path |
 
-Keep dot-prefixed folders when extracting an archive. All methods use the same
-installer. A plugin, PyPI/pipx package, and remote bootstrap command have not been
-shipped; earlier suggestions for those were design options, not working commands.
+Keep dot-prefixed folders when extracting an archive. Codex users can also add
+this repository as a marketplace and install `rightsize-goal@rightsize-goal`.
+That plugin safely installs the **Codex skill only**. Codex plugins cannot yet
+bundle custom agents, so the five roles still need `codex/install.py` for the
+full workflow. Use the installer as the supported full install path; avoid
+combining plugin and manual installs of the skill, which creates two copies
+that can drift. See [installation and maintenance](docs/install.md) for the
+plugin commands and details.
 
 See [installation and maintenance](docs/install.md) for custom destinations,
 legacy mode, conflicts, backups, removal, and troubleshooting. Verification checks

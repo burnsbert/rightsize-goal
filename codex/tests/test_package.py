@@ -18,6 +18,29 @@ SKILL = PACKAGE / ".agents/skills/rightsize-goal"
 
 
 class PackageTests(unittest.TestCase):
+    def test_codex_marketplace_packages_codex_skill(self):
+        marketplace = json.loads((REPO / ".agents/plugins/marketplace.json").read_text(encoding="utf-8"))
+        self.assertEqual("rightsize-goal", marketplace["name"])
+        self.assertEqual(1, len(marketplace["plugins"]))
+        entry = marketplace["plugins"][0]
+        self.assertEqual("rightsize-goal", entry["name"])
+        self.assertEqual({"source": "local", "path": "./codex"}, entry["source"])
+        plugin_root = (REPO / entry["source"]["path"]).resolve()
+        self.assertEqual(PACKAGE.resolve(), plugin_root)
+        manifest = json.loads((plugin_root / ".codex-plugin/plugin.json").read_text(encoding="utf-8"))
+        self.assertEqual(entry["name"], manifest["name"])
+        self.assertEqual("./skills/", manifest["skills"])
+        packaged_skill = plugin_root / manifest["skills"] / "rightsize-goal"
+        source_files = {path.relative_to(SKILL) for path in SKILL.rglob("*")
+                        if path.is_file() and "__pycache__" not in path.parts}
+        packaged_files = {path.relative_to(packaged_skill) for path in packaged_skill.rglob("*")
+                          if path.is_file()}
+        self.assertEqual(source_files, packaged_files)
+        for relative in source_files:
+            self.assertEqual((SKILL / relative).read_bytes(), (packaged_skill / relative).read_bytes())
+        self.assertTrue((packaged_skill / "scripts/goal_gate.py").is_file())
+        self.assertTrue((packaged_skill / "scripts/task_usage.py").is_file())
+
     def test_installed_skill_retains_mit_notice(self):
         self.assertEqual((REPO / "LICENSE").read_text(encoding="utf-8").strip(),
                          (SKILL / "LICENSE").read_text(encoding="utf-8").strip())

@@ -49,7 +49,8 @@ sh codex/install.sh && sh codex/install.sh --verify
 ```
 
 See the [Codex installation and usage guide](codex/README.md) for copy, source archive, and
-contributor symlink installation, a first goal, and the model requirements.
+contributor symlink installation, the skill-only Codex marketplace option, a first goal,
+and the model requirements.
 [Usage](codex/docs/usage.md) explains acceptance criteria, time bounds, stopping, and
 resuming. [Accounting](codex/docs/accounting.md) explains what is measured and which data
 stays local.

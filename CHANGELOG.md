@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.0 — 2026-09-24
 
 ### Claude Code
 
@@ -61,6 +61,7 @@
 
 ### Codex
 
+- Add a Codex marketplace entry that installs the Codex skill instead of the Claude Code plugin; the five custom agents still require `codex/install.py`.
 - Store the usage ledger and one call/result JSONL log per goal under the current directory's `.rightsize-goal/`; include agent identity, retry reason, measured tokens, and estimated cost, with no new user-wide Rightsize Goal logs.
 - Codex skill with five model/effort-specific roles and evidence-based escalation; GPT-6 Luna and Sol replace their 5.6 counterparts. The roster is junior, midlevel, senior (Sol/medium), staff (Sol/high), and principal (Astra/medium); the Terra and Astra/low tiers are retired.
 - Route known moderate work directly to Sol/medium rather than a Luna trial; allow Luna

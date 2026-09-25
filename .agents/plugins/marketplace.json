@@ -1,0 +1,20 @@
+{
+  "name": "rightsize-goal",
+  "interface": {
+    "displayName": "Rightsize Goal for Codex"
+  },
+  "plugins": [
+    {
+      "name": "rightsize-goal",
+      "source": {
+        "source": "local",
+        "path": "./codex"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

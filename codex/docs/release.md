@@ -20,8 +20,8 @@ documentation were reviewed. Verified defects fixed during that review:
 - Upgrades retire the former lower-senior and generic Astra role filenames safely;
   older staff/principal definitions are backed up and replaced when forced.
 
-Local verification uses Windows and Python 3.13. The installed CLI reports
-`codex-cli 0.153.4`. Automated tests exercise package consistency, clean copy
+The September 24 marketplace verification used macOS, Python 3.13, and
+`codex-cli 0.156.1`. Automated tests exercise package consistency, clean copy
 installation and verification, backup/conflict/rollback behavior, timing gates,
 platform installer entry points, and synthetic telemetry accounting. Skill metadata
 validation also passes. The isolated runtime probe confirmed that Codex discovers
@@ -38,7 +38,10 @@ The bundled tariff values were checked against the four linked official model
 pages on September 7; the original rate version and expiry remain unchanged.
 
 The local suite count and result should be refreshed immediately before release.
-During the September 9 review, all 45 Codex tests ran and passed locally.
+On September 24, all 50 Codex tests and 65 Claude Code tests passed locally.
+The Codex marketplace installed the Codex skill and helper scripts in an isolated
+`CODEX_HOME`, while an isolated Claude Code install still reported one skill and
+four agents. Both strict Claude manifest validations passed.
 The new GitHub Actions matrix covers Windows, macOS, and Linux with Python 3.11
 and 3.13; its remote results have not been observed in this local review.
 
@@ -70,10 +73,11 @@ error-free behavior.
 
 ## Distribution scope
 
-Supported instructions currently cover clone/copy, extracted source archive/copy,
-and contributor symlinks. Uninstall is documented manual removal. A plugin
-marketplace listing, PyPI/pipx package, remote bootstrap, automated updater, and
-automated uninstaller are future options, not release artifacts in this tree.
+Supported instructions cover clone/copy, extracted source archive/copy,
+contributor symlinks, and a Codex marketplace plugin for the skill alone.
+The five custom agents still require the installer. Uninstall is documented
+manual removal. A PyPI/pipx package, remote bootstrap, automated updater, and
+automated uninstaller are not release artifacts in this tree.
 
 Keep this checklist host-specific when adding Claude Code support. Do not make
 claims about Claude Code testing based on Codex results.
