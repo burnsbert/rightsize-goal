@@ -53,8 +53,9 @@ error-free behavior.
 - Observe the complete CI matrix passing, including symlink coverage on a host
   that permits symlinks. Exercise the public shell and PowerShell entry points.
 - Install from a clean source archive, including dot-prefixed payload folders.
-- Start a fresh Codex session and confirm the skill and all six named roles load;
-  confirm retired lower-senior/generic-Astra roles no longer appear after upgrade.
+- Start a fresh Codex session and confirm the skill and all five named roles load;
+  confirm retired upper-midlevel, lower-senior, and generic-Astra roles no longer appear
+  after upgrade.
 - Run a small goal in a disposable project. Confirm suitable delegation, verified
   acceptance, a saved log/gate, and honest usage results (available or explained gaps).
 - Test a requested stop and a resumed run using the same gate. On hosts exposing
@@ -63,7 +64,7 @@ error-free behavior.
 - Recheck tariff expiry and linked rates. Change the tariff version when rates change;
   do not rewrite historical ledger snapshots.
 - Ensure no credentials, local logs, databases, or private backups enter the release.
-- Include the root MIT `LICENSE`, docs, skill helpers/references, and all six roles
+- Include the root MIT `LICENSE`, docs, skill helpers/references, and all five roles
   in any downloadable bundle. Root source archives already carry these files.
 - Update `CHANGELOG.md`, select a version/tag, and publish only the tested commit.
 

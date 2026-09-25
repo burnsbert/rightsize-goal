@@ -67,11 +67,12 @@ sh claude-code/install.sh --verify
 | Resource | Default destination |
 | --- | --- |
 | Skill, references, helpers | `~/.claude/skills/rightsize-goal/` |
-| Seven `rightsize-*-doer.md` role files | `~/.claude/agents/` |
-| Usage ledger created during runs | `~/.claude/rightsize-goal/usage.sqlite3` |
+| Four `rightsize-*-doer.md` role files | `~/.claude/agents/` |
+| Usage ledger and goal logs created during runs | `<current-directory>/.rightsize-goal/` |
 | Replacement backups | `~/.claude/rightsize-goal/install-backups/<timestamp>/` |
 
-`CLAUDE_CONFIG_DIR` overrides `~/.claude` for all four. `--claude-dir PATH` overrides the
+`CLAUDE_CONFIG_DIR` overrides `~/.claude` for the skill, the role files, and the backups; the
+usage ledger and goal logs always live in the directory you run from. `--claude-dir PATH` overrides the
 installer's destination for a single run; it does not configure Claude Code to look
 somewhere else, so if you use a custom configuration directory, launch Claude Code with the
 same `CLAUDE_CONFIG_DIR`.
@@ -125,6 +126,12 @@ The unaffected path is a plain in-process subagent (Agent Teams off, or a coordi
 the worker's name), where `effort` frontmatter is honored. Until the upstream bug is fixed, treat
 a role's declared effort as reliable only on that path, and check `/tasks` while a worker is
 active to see the effort it actually ran at.
+
+As of September 24, 2026 the issue is still open with no linked fix. It was last reproduced
+publicly on Claude Code `2.1.233`; nobody has re-tested it on `2.1.282`, so assume it still
+applies. Because every effort-bearing role pins `high`, it only changes behavior when the
+coordinator session runs at a different level — for example, a coordinator at `/effort medium`
+runs its teammates at `medium`, including the senior Opus role.
 
 A teammate is a whole session rather than a lightweight helper, so it loads its own project
 instructions and orients itself before touching the work you assigned. Its floor cost per
@@ -180,8 +187,7 @@ rightsize-principal-doer.md
 For symlink installs, remove the links themselves, not their targets. There is no automated
 uninstall command for the manual method.
 
-By default, keep the usage ledger, the backups, and each project's `.rightsize-goal/`
-records. Delete those separately only if you want to discard that history.
+By default, keep the backups and each project's `.rightsize-goal/` records. Delete those separately only if you want to discard that history.
 
 ## Troubleshooting
 

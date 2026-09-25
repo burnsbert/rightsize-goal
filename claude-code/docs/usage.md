@@ -15,6 +15,11 @@ for this role. A skill's frontmatter can only override model and effort for a si
 this workflow does not try to set them for you — the session settings above are what actually
 hold.
 
+When invoked for a short self-contained request, the skill handles it in the main
+session and skips agents, accounting, and persistent goal setup. A current-time
+lookup or trivial localized edit is an example. Explicit `/goal`, time or
+iteration bounds, and requests to resume a run use the persistent workflow.
+
 If `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is set, workers run as reusable teammates and the
 coordinator can send follow-up assignments to a warm worker. Without it, each dispatch is a
 fresh in-process subagent and the coordinator bundles related work more aggressively instead.
@@ -88,16 +93,13 @@ mechanism that blocks stopping.
 
 ## What happens
 
-The coordinator records the objective and acceptance conditions, resolves the role names
+For a persistent run, the coordinator records the objective and acceptance conditions, resolves the role names
 available in this session, creates a unique local log and completion gate, then assigns
 bounded work to suitable roles. It verifies receipts, records accepted results or rework,
 and escalates when justified.
 
 Each worker gets its own subagent transcript, so the accounting helper measures each
-assignment directly rather than dividing up a session total. The log under
-`.rightsize-goal/<run-id>.md` contains assignments, evidence, current state, and cost notes.
-`<run-id>.gate.json` retains the time bounds and the evaluated iteration count. The
-coordinator adds the scratch directory to the project's local Git exclusion when applicable.
+assignment directly rather than dividing up a session total. Each `.rightsize-goal/<goal-id>.jsonl` log contains only agent calls and results, including agent identity, measured tokens, estimated cost, and reasons for retries. The matching `.state.json` holds current objective and evidence; `.gate.json` retains the time bounds and evaluated iteration count. The coordinator adds `.rightsize-goal/` to the project's local Git exclusion when applicable.
 Do not commit logs containing private work.
 
 One substantive iteration includes a hypothesis or improvement, a meaningful action, an
@@ -122,7 +124,7 @@ checkpoint, and use `/goal clear` if a session goal would otherwise keep it goin
 To resume, point at the existing run log:
 
 ```text
-/rightsize-goal:rightsize-goal Resume from .rightsize-goal/<existing-run-id>.md.
+/rightsize-goal:rightsize-goal Resume from .rightsize-goal/<existing-goal-id>.state.json.
 Keep the saved objective, bounds, completed iterations, and prior results.
 ```
 
@@ -134,7 +136,7 @@ The gate helper has no command to edit existing bounds automatically.
 
 - A skill guides the coordinator; it is not a host-level watchdog. Crashes, usage limits,
   account policy, missing tools, or model instruction failures can interrupt it.
-- `/goal` holds a session open but does not schedule future sessions. A scratch log alone
+- `/goal` holds a session open but does not schedule future sessions. A saved goal log alone
   schedules nothing.
 - More agents can increase token consumption. The policy seeks lower total cost including
   rework; it does not establish guaranteed savings, and the Claude price ladder is flat

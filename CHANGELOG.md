@@ -4,9 +4,11 @@
 
 ### Claude Code
 
+- Store the usage ledger and one call/result JSONL log per goal under the current directory's `.rightsize-goal/`; include agent identity, retry reason, measured tokens, and estimated cost, with no new user-wide Rightsize Goal logs.
+- One-step requests use the main Claude Code session without agent dispatch or persistent goal setup.
 - New `claude-code/` implementation, distributed as a Claude Code plugin with a repository
   marketplace manifest; two commands install it and `/plugin update` maintains it.
-- Four subagent roles across Claude Haiku 4.5, Sonnet 5, Opus 5, and Fable 5.1 (one role per
+- Four subagent roles across Claude Haiku 4.5, Sonnet 5, Opus 5.5, and Fable 5.1 (one role per
   model, each paid role at `high` effort), each pinning model and effort, since the Agent
   tool has no dispatch-time effort override. Simplified before first release from an
   earlier seven-role ladder (a `medium`- and a `high`-effort variant of each paid model);
@@ -30,8 +32,14 @@
   the `agentName`/`teamName` recorded in their own session transcript) and plain in-process
   subagents, with the workflow adapting and reporting when reuse is unavailable.
 - Effort levels set from Anthropic's published per-model guidance rather than inherited from
-  the Codex tiers: each paid model runs at `high`, the documented API default. `xhigh` and
-  `max` are deliberately unused, so every role runs at, not above, a default session.
+  the Codex tiers: each paid role runs at `high`. That is the documented API default for
+  Sonnet 5 and Fable 5.1; Opus 5.5 defaults to `medium`, and the senior role deliberately
+  runs one level above it so a documented Opus struggle reflects a serious attempt. `xhigh`
+  and `max` are deliberately unused, so no role runs above a default session.
+- The senior role runs on Claude Opus 5.5, which the `opus` alias now resolves to
+  (`claude-opus-5-5`); the tariff adds its rates and keeps `claude-opus-5` for pricing
+  earlier transcripts. Fable 5.1 stays as a break-glass tier, used only after documented
+  Opus struggle.
 - Fable escalation evidence comes from a dispatched Opus-tier child whose documented struggle
   the coordinator relays and judges, rather than from the coordinator's own work. A cheaper
   tier's failure remains insufficient however it is relayed.
@@ -49,13 +57,15 @@
 
 ### Codex
 
-- Codex skill with six model/effort-specific roles and evidence-based escalation.
-- Route known moderate work to Terra/high sooner; allow Luna factual research that
-  has clear sources and no material judgment call.
+- Store the usage ledger and one call/result JSONL log per goal under the current directory's `.rightsize-goal/`; include agent identity, retry reason, measured tokens, and estimated cost, with no new user-wide Rightsize Goal logs.
+- Codex skill with five model/effort-specific roles and evidence-based escalation; GPT-6 Luna and Sol replace their 5.6 counterparts. The roster is junior, midlevel, senior (Sol/medium), staff (Sol/high), and principal (Astra/medium); the Terra and Astra/low tiers are retired.
+- Route known moderate work directly to Sol/medium rather than a Luna trial; allow Luna
+  factual research that has clear sources and no material judgment call.
 - Use the Sol/high staff engineer as the strongest first pass for the most complex
-  work where Astra escalation is most at risk; label Sol/medium senior engineer and
-  consolidate Astra into one medium-effort principal engineer role.
+  work where Astra escalation is most at risk; Astra is one medium-effort principal
+  engineer role.
 - Report the complete known cost of linked rework/escalation chains by initial route.
+- One-step requests use the main Codex thread without agent dispatch or persistent goal setup.
 - Persistent completion gate with time/iteration bounds and saved run state.
 - Local task usage ledger and versioned API-equivalent estimates.
 - Copy installation by default, contributor symlinks, verification, replacement

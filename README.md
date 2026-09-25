@@ -10,8 +10,8 @@ This repository is organized by host. Each implementation documents its own mode
 installation, and limitations; neither assumes the other's APIs.
 
 - [`claude-code/`](claude-code/) — the Claude Code implementation: a plugin with one skill
-  and seven subagent roles across Haiku 4.5, Sonnet 5, Opus 5, and Fable 5.1.
-- [`codex/`](codex/) — the Codex implementation: a skill, seven agent roles, and installers.
+  and four subagent roles across Haiku 4.5, Sonnet 5, Opus 5.5, and Fable 5.1.
+- [`codex/`](codex/) — the Codex implementation: a skill, five agent roles, and installers.
 
 ## Claude Code
 
@@ -33,7 +33,7 @@ Acceptance: exported rows match the active filters and tests pass.
 
 See the [Claude Code guide](claude-code/README.md) for a manual install, the role table,
 and how to check model access. [Usage](claude-code/docs/usage.md) covers acceptance
-criteria, `/goal`, time bounds, stopping, and resuming. [Why these seven
+criteria, `/goal`, time bounds, stopping, and resuming. [Why these four
 roles](claude-code/docs/roles.md) explains the tier boundaries.
 [Accounting](claude-code/docs/accounting.md) explains what is measured and what stays local.
 

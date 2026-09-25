@@ -3,18 +3,18 @@
 Rightsize Goal helps Codex pursue substantial objectives using a small engineering
 team. A coordinator assigns bounded work to a suitable model tier, verifies results,
 and records usage and lessons. It seeks lower total cost including rework; savings
-are not guaranteed. It is useful for multi-step implementation and investigation;
-trivial edits usually do not warrant the coordination overhead.
+are not guaranteed. For a one-step request, the main thread completes it directly
+without dispatching agents or creating persistent goal state.
 
-This package ships one skill, six custom agents, two standard-library Python
+This package ships one skill, five custom agents, two standard-library Python
 helpers, and installers. It uses your existing Codex account and permissions.
 
 ## Requirements
 
 - A local Codex host with custom subagents enabled. Native goal tools are required
-  for automatic continuation, but current-session work can use saved scratch state.
+  for automatic continuation, but current-session work can use saved goal state.
 - Python 3.11 or newer.
-- Access to the model names configured by the six included roles.
+- Access to the model names configured by the five included roles.
 - For optional symlinks on Windows: Developer Mode or appropriate privileges.
 
 ## Install
@@ -38,7 +38,7 @@ sh codex/install.sh --verify
 ```
 
 The default installation copies the skill to `~/.agents/skills/rightsize-goal`
-and the six agent definitions to `$CODEX_HOME/agents` (normally `~/.codex/agents`).
+and the five agent definitions to `$CODEX_HOME/agents` (normally `~/.codex/agents`).
 It leaves global configuration unchanged. Older hosts needing explicit registrations
 can opt into `--legacy-config`, which backs up changed configuration first.
 
@@ -78,7 +78,7 @@ files, not account model entitlement or live goal/subagent behavior.
 
 ## Run
 
-Select `gpt-5.6-sol` with medium reasoning for the root Codex session, then invoke:
+Select `gpt-6-sol` with medium reasoning for the root Codex session, then invoke:
 
 ```text
 Use $rightsize-goal to add regression tests for this project's configuration parser.
@@ -105,17 +105,16 @@ The coordinator routes work among:
 | --- | --- | --- |
 | Junior | Luna/high | Very basic explicit work and factual research without judgment calls |
 | Lower-midlevel | Luna/xhigh | Routine bounded work and evidence gathering using defined criteria |
-| Upper-midlevel | Terra/high | Moderate implementation and research requiring bounded judgment |
-| Senior engineer | Sol/medium | Hard implementation, research, and brainstorming |
-| Staff engineer | Sol/high | Strongest pre-Astra first pass for the most complex and challenging work |
-| Principal engineer | Astra/medium | Bounded unresolved work after documented Sol struggle |
+| Senior | Sol/medium | Moderate to hard implementation, research, and brainstorming |
+| Staff | Sol/high | Strongest pre-Astra first pass for the most complex work; deep interacting constraints |
+| Principal | Astra/medium | Bounded expert work after documented Sol struggle |
 
-Known moderate work goes directly to Terra rather than using Luna as a cheap trial.
+Known moderate work goes directly to Sol/medium rather than using Luna as a cheap trial.
 The most complex work goes directly to Sol/high when Astra escalation is a credible
 risk. Astra has one medium-effort principal engineer role so the escalation receives
 enough reasoning budget without an Astra/low retry.
 
-Project activity is logged under `.rightsize-goal/` in the target project. Cross-project routing history and task usage are stored under `$CODEX_HOME/rightsize-goal/`. The cost figures are standard-rate API-equivalent estimates from a versioned tariff; they are useful for routing comparisons but are not an authoritative subscription bill.
+Each goal has a unique `.rightsize-goal/<goal-id>.jsonl` call/result log in the target project. Task usage and routing history remain in that project's `.rightsize-goal/usage.sqlite3`. The cost figures are standard-rate API-equivalent estimates from a versioned tariff; they are useful for routing comparisons but are not an authoritative subscription bill.
 
 See [accounting and local data](docs/accounting.md) for measurement gaps and privacy.
 

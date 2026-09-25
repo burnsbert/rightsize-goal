@@ -18,11 +18,11 @@ filesystem access, or custom subagents are not supported by this installer.
 | Resource | Default destination |
 | --- | --- |
 | Skill, references, helpers | `~/.agents/skills/rightsize-goal/` |
-| Six `rightsize-*-doer.toml` definitions | `$CODEX_HOME/agents/` |
-| Usage ledger created during runs | `$CODEX_HOME/rightsize-goal/usage.sqlite3` |
+| Five `rightsize-*-doer.toml` definitions | `$CODEX_HOME/agents/` |
+| Usage ledger and goal logs created during runs | `<current-directory>/.rightsize-goal/` |
 | Replacement/config backups | `$CODEX_HOME/rightsize-goal/install-backups/<timestamp>/` |
 
-`CODEX_HOME` defaults to `~/.codex`. It affects the agents and usage ledger, not
+`CODEX_HOME` defaults to `~/.codex`. It affects the agents, not
 the default skill directory. `--codex-dir PATH` and `--skills-dir PATH` override
 installer destinations. They do not configure Codex to discover an arbitrary
 location. If using a custom Codex home, launch Codex with the same `CODEX_HOME`.
@@ -65,9 +65,10 @@ python codex/install.py --verify --legacy-config
 ```
 
 PowerShell uses `-LegacyConfig`. This mode backs up changed configuration and
-replaces only the six active registrations and removes retired Rightsize Goal registrations. Unsupported config layouts are
-rejected rather than rewritten unsafely. It does not make unavailable models or
-goal tools available. New default installs do not remove prior legacy registrations.
+replaces only the five named registrations and removes retired upper-midlevel,
+lower-senior, and generic Astra registrations. Unsupported config layouts are rejected
+rather than rewritten unsafely. It does not make unavailable models or goal tools
+available. New default installs do not remove prior legacy registrations.
 
 Upgrading from the earlier role roster requires `--force`. Existing role files are
 backed up before the installer changes Sol/medium from `rightsize-lower-senior-doer`
@@ -91,6 +92,16 @@ pulling updates files immediately; rerun with `--method symlink --force` if the
 clone path or installed resources changed. To convert a symlink install to copies,
 use `--method copy --force`.
 
+The Terra upper-midlevel, former Sol/medium lower-senior, and generic
+`rightsize-astra-doer` role names have been retired. An upgrade with `--force` backs up and removes their installed agent
+files. It also replaces the former Sol/high senior and Astra/low staff files
+with the new Sol/medium senior and Sol/high staff definitions. If older
+`[agents.rightsize-upper-midlevel-doer]`, `[agents.rightsize-lower-senior-doer]`, or
+`[agents.rightsize-astra-doer]` registrations exist, include `--legacy-config --force` to remove them as well.
+Without `--force`, the installer reports retired or changed files and
+registrations as conflicts and preserves them. Historical usage records keep
+the role name recorded when each task ran.
+
 Without `--force`, differing installed files are preserved and reported as conflicts.
 With it, old resources move into a timestamped backup before replacement. If copying,
 configuration writing, or final verification fails, the installer attempts to remove
@@ -106,32 +117,30 @@ of installed source files.
 ## Uninstall
 
 Close Codex. Remove only `rightsize-goal` from the installed skills directory and
-the six files below from the installed agents directory:
+the five current files below from the installed agents directory:
 
 ```text
 rightsize-junior-doer.toml
 rightsize-midlevel-doer.toml
-rightsize-upper-midlevel-doer.toml
 rightsize-senior-doer.toml
 rightsize-staff-doer.toml
 rightsize-principal-doer.toml
 ```
 
 For symlink installs, remove the links themselves, not their targets. If you used
-legacy mode, remove the matching six `[agents.rightsize-...]` tables from
+legacy mode, remove the matching five `[agents.rightsize-...]` tables from
 `config.toml`, leaving other tables/settings intact. Restart Codex.
-Older installations may also contain retired `rightsize-lower-senior-doer` and
-`rightsize-astra-doer` files or config tables; remove those exact entries too.
+Older installations may also contain retired `rightsize-upper-midlevel-doer`,
+`rightsize-lower-senior-doer`, and `rightsize-astra-doer` files or config tables; remove those exact entries too.
 
-By default, keep usage history, backups, and each project's `.rightsize-goal/`
-records. Delete those separately only if you want to discard that history.
+By default, keep backups and each project's `.rightsize-goal/` records. Delete those separately only if you want to discard that history.
 There is currently no automated uninstall command.
 
 ## Troubleshooting
 
 - **Skill or agents missing:** start a fresh session; check destinations and
   `CODEX_HOME`; run `--verify`. An older host may need legacy mode. Installing
-  only the skill with a generic skill installer omits the six agent definitions.
+  only the skill with a generic skill installer omits the five agent definitions.
 - **Model unavailable:** inspect your account/host's model access. Installing a
   role does not grant access. Do not silently replace model names and assume
   the original routing or pricing still applies.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Record prompt-free, per-task Codex token usage in a global SQLite database."""
+"""Record prompt-free Codex task usage and per-goal agent events in the current project."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import argparse
 import json
 import math
 import os
+import re
 import sqlite3
 import sys
 from collections import defaultdict
@@ -40,7 +41,25 @@ def _codex_home() -> Path:
 
 
 def default_db() -> Path:
-    return _codex_home() / "rightsize-goal" / "usage.sqlite3"
+    return Path.cwd() / ".rightsize-goal" / "usage.sqlite3"
+
+
+def _goal_log(db_path: Path, run_id: str) -> Path:
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,99}", run_id):
+        raise UsageError("goal ID must be filename-safe (letters, digits, underscore, hyphen)")
+    return db_path.parent / f"{run_id}.jsonl"
+
+
+def _append_goal_event(db_path: Path, run_id: str, event: dict[str, Any]) -> None:
+    path = _goal_log(db_path, run_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    line = (json.dumps(event, sort_keys=True, ensure_ascii=False) + "\n").encode("utf-8")
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    try:
+        if os.write(descriptor, line) != len(line):
+            raise OSError(f"short write to goal log {path}")
+    finally:
+        os.close(descriptor)
 
 
 def _connect(path: Path) -> sqlite3.Connection:
@@ -290,6 +309,9 @@ def _cost(models: dict[str, dict[str, int]], tariff: dict[str, Any] | None) -> t
 
 
 def start(args: argparse.Namespace) -> dict[str, Any]:
+    _goal_log(args.db, args.run)
+    if args.prior_task and not args.reason:
+        raise UsageError("--reason is required when --prior-task links an earlier result")
     session = resolve_session(args.thread_id, args.session)
     if args.new_thread:
         baseline = {"status": "available", "models": {}, "efforts": {}, "resets": 0, "basis": "explicit_new_thread_zero"}
@@ -313,10 +335,15 @@ def start(args: argparse.Namespace) -> dict[str, Any]:
             if existing:
                 raise UsageError(f"thread already has active task {existing['run_id']}/{existing['task_id']}") from exc
             raise UsageError(f"task already exists: {args.run}/{args.task}") from exc
+        _append_goal_event(args.db, args.run, {"event": "agent_call", "goal_id": args.run,
+            "task_id": args.task, "at": _now(), "agent": args.role, "thread_id": args.thread_id,
+            "requested_model": args.model, "requested_effort": args.effort, "mode": args.mode,
+            "difficulty": args.difficulty, "prior_task": args.prior_task, "reason": args.reason})
     return {"command": "start", "run": args.run, "task": args.task, "status": "active", "baseline_status": baseline["status"], "session_path": str(session) if session else None, "finish_before_reusing_thread": True}
 
 
 def finish(args: argparse.Namespace) -> dict[str, Any]:
+    _goal_log(args.db, args.run)
     with closing(_connect(args.db)) as db, db:
         row = db.execute("SELECT * FROM tasks WHERE run_id=? AND task_id=?", (args.run, args.task)).fetchone()
         if row is None:
@@ -349,8 +376,15 @@ def finish(args: argparse.Namespace) -> dict[str, Any]:
              usage_status, json.dumps(totals, sort_keys=True) if totals is not None else None,
              json.dumps(models, sort_keys=True) if usage_status == "available" else None,
              json.dumps(efforts, sort_keys=True) if usage_status == "available" else None,
-             cost_status, cost_usd, usage_reason, cost_reason, args.run, args.task),
+            cost_status, cost_usd, usage_reason, cost_reason, args.run, args.task),
         )
+        _append_goal_event(args.db, args.run, {"event": "agent_result", "goal_id": args.run,
+            "task_id": args.task, "at": _now(), "agent": row["role"], "thread_id": row["thread_id"],
+            "outcome": args.outcome, "evidence": args.evidence, "lesson": args.lesson,
+            "tokens": totals, "usage_status": usage_status, "usage_reason": usage_reason,
+            "estimated_cost_usd": cost_usd, "cost_status": cost_status,
+            "cost_reason": cost_reason, "tariff_version": tariff.get("version") if tariff else None,
+            "actual_models": sorted(models), "actual_efforts": sorted(efforts)})
     result = {"command": "finish", "run": args.run, "task": args.task, "status": "finished", "idempotent": False, "outcome": args.outcome, "usage_status": usage_status, "tokens": totals, "actual_models": sorted(models), "actual_efforts": sorted(efforts), "cost_status": cost_status, "cost_usd": cost_usd, "tariff_version": tariff.get("version") if tariff else None, "cost_assumptions": ASSUMPTIONS, "recorded_at": _display_now()}
     if usage_reason:
         result["usage_reason"] = usage_reason
@@ -468,6 +502,7 @@ def _parser() -> argparse.ArgumentParser:
     begin.add_argument("--new-thread", action="store_true")
     begin.add_argument("--tariff", type=Path)
     begin.add_argument("--prior-task")
+    begin.add_argument("--reason", help="why this call is needed, especially after an insufficient result")
     begin.add_argument("--domain")
     end = commands.add_parser("finish")
     end.add_argument("--run", required=True)

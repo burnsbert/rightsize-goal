@@ -23,12 +23,11 @@ import tomllib
 ROLES = (
     "rightsize-junior-doer",
     "rightsize-midlevel-doer",
-    "rightsize-upper-midlevel-doer",
     "rightsize-senior-doer",
     "rightsize-staff-doer",
     "rightsize-principal-doer",
 )
-RETIRED_ROLES = ("rightsize-lower-senior-doer", "rightsize-astra-doer")
+RETIRED_ROLES = ("rightsize-upper-midlevel-doer", "rightsize-lower-senior-doer", "rightsize-astra-doer")
 MANAGED_ROLES = ROLES + RETIRED_ROLES
 
 
@@ -126,6 +125,9 @@ def verify(root: Path, codex: Path, skills: Path, legacy_config: bool = False) -
         problems.append(f"cannot read valid config: {exc}")
         return problems
     configured = parsed.get("agents", {})
+    for role in RETIRED_ROLES:
+        if role in configured:
+            problems.append(f"retired config registration remains: {role}")
     for role in ROLES:
         expected = (codex / "agents" / f"{role}.toml").resolve()
         entry = configured.get(role)
@@ -137,9 +139,6 @@ def verify(root: Path, codex: Path, skills: Path, legacy_config: bool = False) -
             actual = codex / actual
         if actual.resolve() != expected:
             problems.append(f"wrong config registration: {role}")
-    for role in RETIRED_ROLES:
-        if role in configured:
-            problems.append(f"retired config registration: {role}")
     return problems
 
 
@@ -163,14 +162,23 @@ def install(args: argparse.Namespace, root: Path, codex: Path, skills: Path) -> 
     config = codex / "config.toml"
     old_config = config.read_bytes() if config.exists() else b""
     legacy_config = getattr(args, "legacy_config", False)
+    if old_config and not legacy_config:
+        try:
+            existing_agents = tomllib.loads(old_config.decode("utf-8-sig")).get("agents", {})
+        except (UnicodeDecodeError, tomllib.TOMLDecodeError):
+            existing_agents = {}
+        retired_registrations = [role for role in RETIRED_ROLES if role in existing_agents]
+        if retired_registrations:
+            raise SystemExit("Retired role registrations remain: " + ", ".join(retired_registrations)
+                             + ". They require migration: rerun with --legacy-config --force to back up and remove them.")
     new_bytes = old_config
     if legacy_config:
         old_text = old_config.decode("utf-8-sig").replace("\r\n", "\n").replace("\r", "\n")
         new_bytes = desired_config(old_text, codex, root).encode("utf-8")
         old_agents = tomllib.loads(old_text).get("agents", {})
         new_agents = tomllib.loads(new_bytes.decode("utf-8"))["agents"]
-        changed_roles = [role for role in ROLES if role in old_agents and old_agents[role] != new_agents[role]]
-        changed_roles.extend(role for role in RETIRED_ROLES if role in old_agents)
+        changed_roles = [role for role in (*ROLES, *RETIRED_ROLES)
+                         if role in old_agents and old_agents[role] != new_agents.get(role)]
         if changed_roles and not args.force:
             raise SystemExit("Existing config registrations conflict: " + ", ".join(changed_roles) + ". Use --force to back up and replace them.")
     elif old_config:
@@ -191,10 +199,8 @@ def install(args: argparse.Namespace, root: Path, codex: Path, skills: Path) -> 
             current = True
         if not current:
             conflicts.append(target)
-    conflicts.extend(
-        target for target in (codex / "agents" / f"{role}.toml" for role in RETIRED_ROLES)
-        if os.path.lexists(target)
-    )
+    retired_targets = [codex / "agents" / f"{role}.toml" for role in RETIRED_ROLES]
+    conflicts.extend(target for target in retired_targets if os.path.lexists(target))
     if conflicts and not args.force:
         listing = "\n".join(f"  {item}" for item in conflicts)
         raise SystemExit(f"Existing resources conflict:\n{listing}\nRerun with --force to back them up and replace them.")

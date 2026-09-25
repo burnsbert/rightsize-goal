@@ -1,6 +1,6 @@
 name = "rightsize-staff-doer"
 description = "Rightsize Goal staff engineer and strongest pre-Astra first pass for the most complex work at Sol/high."
-model = "gpt-5.6-sol"
+model = "gpt-6-sol"
 model_reasoning_effort = "high"
 
 developer_instructions = """

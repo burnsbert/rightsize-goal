@@ -5,6 +5,7 @@ import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 MODULE_PATH = (
@@ -87,7 +88,40 @@ class TaskUsageTests(unittest.TestCase):
                      "--session", str(self.session), "--tariff", str(self.tariff)]
         if extra.get("prior"):
             arguments += ["--prior-task", extra["prior"]]
+        if extra.get("reason"):
+            arguments += ["--reason", extra["reason"]]
         return self._call(*arguments)
+
+    def test_default_ledger_is_local_to_current_directory(self):
+        with patch("pathlib.Path.cwd", return_value=self.root):
+            self.assertEqual(self.root / ".rightsize-goal" / "usage.sqlite3", usage.default_db())
+
+    def test_log_write_failure_rolls_back_assignment(self):
+        with patch.object(usage, "_append_goal_event", side_effect=OSError("disk full")):
+            self.assertEqual(1, self._start()[0])
+        self.assertEqual(0, self._start()[0])
+
+    def test_goal_log_records_calls_results_retries_and_separate_goals(self):
+        self.assertEqual(0, self._start()[0])
+        self._tokens(200, 50, 70, 25)
+        self.assertEqual(0, self._call("finish", "--run", "run-1", "--task", "task-1", "--outcome", "rework")[0])
+        self.assertEqual(1, self._start(task="task-2", prior="task-1")[0])
+        self.assertEqual(0, self._start(task="task-2", prior="task-1", reason="acceptance check failed")[0])
+        self._tokens(210, 55, 75, 25)
+        self.assertEqual(0, self._call("finish", "--run", "run-1", "--task", "task-2", "--outcome", "accepted")[0])
+        self.assertEqual(0, self._start(task="task-3", run="run-2")[0])
+        log = [json.loads(line) for line in (self.root / "run-1.jsonl").read_text().splitlines()]
+        self.assertEqual(["agent_call", "agent_result", "agent_call", "agent_result"], [e["event"] for e in log])
+        self.assertTrue(all(e["agent"] == "worker" and e["goal_id"] == "run-1" for e in log))
+        self.assertEqual("acceptance check failed", log[2]["reason"])
+        self.assertEqual("task-1", log[2]["prior_task"])
+        self.assertEqual(100, log[1]["tokens"]["input_tokens"])
+        self.assertAlmostEqual(0.001092, log[1]["estimated_cost_usd"])
+        self.assertEqual(1, len((self.root / "run-2.jsonl").read_text().splitlines()))
+        self._call("finish", "--run", "run-1", "--task", "task-1", "--outcome", "accepted")
+        self.assertEqual(4, len((self.root / "run-1.jsonl").read_text().splitlines()))
+        self.assertEqual(1, self._start(task="task-4", run="../escape")[0])
+        self.assertFalse((self.root.parent / "escape.jsonl").exists())
 
     def test_delta_cost_and_reasoning_is_not_double_counted(self):
         self.assertEqual(self._start()[0], 0)
@@ -184,7 +218,7 @@ class TaskUsageTests(unittest.TestCase):
         self.assertEqual(self._start()[0], 0)
         self._tokens(110, 22, 33, 11)
         self._call("finish", "--run", "run-1", "--task", "task-1", "--outcome", "rework")
-        self.assertEqual(self._start(task="task-2", prior="task-1")[0], 0)
+        self.assertEqual(self._start(task="task-2", prior="task-1", reason="rework needed")[0], 0)
         self._tokens(125, 25, 40, 14)
         self._call("finish", "--run", "run-1", "--task", "task-2", "--outcome", "accepted")
         report = self._call("report", "--run", "run-1")[1]
@@ -202,7 +236,7 @@ class TaskUsageTests(unittest.TestCase):
         arguments = ["start", "--run", "run-1", "--task", "task-2", "--project-tag", "other",
                      "--role", "worker", "--model", "model-a", "--effort", "medium", "--mode", "delegated",
                      "--difficulty", "routine", "--thread-id", "thread-1", "--session", str(self.session),
-                     "--tariff", str(self.tariff), "--prior-task", "task-1"]
+                     "--tariff", str(self.tariff), "--prior-task", "task-1", "--reason", "rework needed"]
         self.assertEqual(self._call(*arguments)[0], 0)
         self._tokens(115, 23, 36, 12)
         self._call("finish", "--run", "run-1", "--task", "task-2", "--outcome", "accepted")

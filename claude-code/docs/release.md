@@ -12,6 +12,12 @@ per-role dispatch results naming `midlevel`/`medium`, `upper-midlevel`, `lower-s
 current four roles before tagging; do not treat the counts and per-role results below as
 current.
 
+On September 24, 2026 the senior role moved from Claude Opus 5 to Claude Opus 5.5, still at
+`high`. Its `model: opus` alias did not change; Claude Code `2.1.282` was confirmed to serve
+`claude-opus-5-5` for `--model opus`, and the tariff gained that model's rates. A live senior
+dispatch on Opus 5.5 has not yet been observed, so its recorded model and effort are
+unverified. The automated suite now has 65 tests.
+
 ## Review status: September 7, 2026
 
 This is the first release of the Claude Code package. It was written against Claude Code

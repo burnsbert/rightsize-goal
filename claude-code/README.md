@@ -3,8 +3,8 @@
 Rightsize Goal helps Claude Code pursue substantial objectives using a small engineering
 team. A coordinator assigns bounded work to a suitable model tier, verifies results, and
 records usage and lessons. It seeks lower total cost including rework; savings are not
-guaranteed. It is useful for multi-step implementation and investigation; trivial edits
-usually do not warrant the coordination overhead.
+guaranteed. For a one-step request, the main session completes it directly without
+dispatching agents or creating persistent goal state.
 
 This package ships one skill, four subagent roles, two standard-library Python helpers,
 and an installer. It uses your existing Claude Code account and permissions.
@@ -12,10 +12,11 @@ and an installer. It uses your existing Claude Code account and permissions.
 ## Requirements
 
 - Claude Code with subagent `model` and `effort` frontmatter support. Verified against
-  `2.1.263`; the oldest compatible version has not been established.
-- Access to Claude Haiku 4.5, Sonnet 5, Opus 5, and Fable 5.1 on your account. Roles for
+  `2.1.263`, and the `opus` alias was confirmed to serve Opus 5.5 on `2.1.282`; the oldest
+  compatible version has not been established.
+- Access to Claude Haiku 4.5, Sonnet 5, Opus 5.5, and Fable 5.1 on your account. Roles for
   a model you cannot use will fail at dispatch. See [checking model access](#check-model-access).
-- Python 3.11 or newer, for the two helper scripts. No third-party packages.
+- Python 3.11 or newer for persistent runs using the two helper scripts. No third-party packages.
 - A trusted workspace, if you want `/goal` to hold the session open.
 - Optionally `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`. Recommended, not required: it lets the
   coordinator reuse a warm worker across related assignments instead of rebuilding its context
@@ -158,16 +159,15 @@ See [usage examples, stop and resume, and limitations](docs/usage.md).
 | --- | --- | --- |
 | Junior | Haiku 4.5 | Very basic explicit work |
 | Midlevel | Sonnet 5 / high | Bounded work using established patterns, including moderately complex work needing more judgment |
-| Senior | Opus 5 / high | Hard implementation, research, brainstorming, and deep interacting constraints |
-| Principal | Fable 5.1 / high | Hardest bounded work after documented Opus struggle |
+| Senior | Opus 5.5 / high | Hard implementation, research, brainstorming, and deep interacting constraints |
+| Principal | Fable 5.1 / high | Break-glass only: hardest bounded work after documented Opus struggle |
 
 Haiku 4.5 does not take an effort setting, so the junior role pins the model only. Every
 other role pins both, and the Agent tool has no dispatch-time effort override, which is
 why the roles exist as files rather than as instructions. [Why these four](docs/roles.md)
 explains the boundaries, what each role can and cannot touch, and how to change them.
 
-Project activity is logged under `.rightsize-goal/` in the target project. Cross-project
-routing history and task usage live in `~/.claude/rightsize-goal/`. Cost figures are
+Each goal has a unique `.rightsize-goal/<goal-id>.jsonl` call/result log in the target project. Task usage and routing history remain in that project's `.rightsize-goal/usage.sqlite3`. Cost figures are
 standard-rate API-equivalent estimates from a versioned tariff; they are useful for
 routing comparisons and are not an authoritative bill. A Claude Code subscription is not
 billed per token at all.

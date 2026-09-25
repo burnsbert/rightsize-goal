@@ -2,8 +2,13 @@
 
 Give the coordinator an objective, observable acceptance conditions, scope, and
 any actual limits. Open Codex in the project you want it to work on. Select
-`gpt-5.6-sol` at medium reasoning when available. Other root models are disclosed
+`gpt-6-sol` at medium reasoning when available. Other root models are disclosed
 as a mismatch; the skill cannot switch the root model for you.
+
+When invoked for a short self-contained request, the skill handles it in the main
+thread and skips agents, accounting, and persistent goal setup. A current-time
+lookup or trivial localized edit is an example. Explicit `/goal`, time or
+iteration bounds, and requests to resume a run use the persistent workflow.
 
 ## Examples
 
@@ -49,10 +54,7 @@ existing native goal, creates a unique local log and completion gate, then assig
 bounded work to suitable agents. It verifies receipts, records accepted results
 or rework, and escalates when justified. The role table is in the [Codex README](../README.md).
 
-The log under `.rightsize-goal/<run-id>.md` contains assignments, evidence, current
-state, and cost notes. `<run-id>.gate.json` retains time bounds and evaluated
-iteration count. The coordinator adds the scratch directory to the project's
-local Git exclusion when applicable. Do not commit logs containing private work.
+Each `.rightsize-goal/<goal-id>.jsonl` log contains only agent calls and results, including agent identity, measured tokens, estimated cost, and reasons for retries. The matching `.state.json` holds current objective and evidence; `.gate.json` retains time bounds and evaluated iteration count. The coordinator adds `.rightsize-goal/` to the project's local Git exclusion when applicable. Do not commit logs containing private work.
 
 One substantive iteration includes a hypothesis/improvement, meaningful action,
 evaluation, and retained evidence. Tool calls, retries without new information,
@@ -77,7 +79,7 @@ to stop native continuation as well.
 For resumption, point to the existing run log:
 
 ```text
-Resume $rightsize-goal from .rightsize-goal/<existing-run-id>.md.
+Resume $rightsize-goal from .rightsize-goal/<existing-goal-id>.state.json.
 Keep the saved objective, bounds, completed iterations, and prior results.
 ```
 
@@ -90,7 +92,7 @@ state. The gate helper has no command to edit existing bounds automatically.
 - A skill guides the coordinator; it is not a host-level watchdog. Crashes, usage
   limits, account policy, missing tools, or model instruction failures can interrupt it.
 - Native goal tools are optional for current-session work, but required for native
-  automatic continuation. A scratch log alone does not schedule future execution.
+  automatic continuation. A saved goal log alone does not schedule future execution.
 - More agents can increase token consumption. The policy seeks lower total cost,
   including rework; it does not establish guaranteed savings.
 - Permissions remain those of the host and user request. Persistent goals do not

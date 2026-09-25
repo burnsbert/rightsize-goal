@@ -164,6 +164,38 @@ class InstallTests(unittest.TestCase):
         installer.install(self.args(), self.package, self.codex, self.skills)
         self.assertEqual([], installer.verify(self.package, self.codex, self.skills))
 
+    def test_upgrade_backs_up_retired_and_renamed_roles(self):
+        agents = self.codex / "agents"
+        agents.mkdir()
+        for role in installer.RETIRED_ROLES:
+            (agents / f"{role}.toml").write_text("old role", encoding="utf-8")
+        for role in ("rightsize-senior-doer", "rightsize-staff-doer"):
+            (agents / f"{role}.toml").write_text("old definition", encoding="utf-8")
+        old_config = self.config.read_text(encoding="utf-8")
+        old_config += "\n".join(
+            f'\n[agents.{role}]\nconfig_file = "agents/{role}.toml"\n'
+            for role in installer.RETIRED_ROLES
+        )
+        self.config.write_text(old_config, encoding="utf-8")
+        with self.assertRaisesRegex(SystemExit, "Retired role registrations remain"):
+            installer.install(self.args(force=True, legacy_config=False), self.package, self.codex, self.skills)
+        with self.assertRaisesRegex(SystemExit, "registrations conflict"):
+            installer.install(self.args(), self.package, self.codex, self.skills)
+        self.assertEqual(old_config, self.config.read_text(encoding="utf-8"))
+        installer.install(self.args(force=True), self.package, self.codex, self.skills)
+        self.assertEqual([], installer.verify(self.package, self.codex, self.skills, True))
+        parsed = tomllib.loads(self.config.read_text(encoding="utf-8"))
+        self.assertEqual(set(installer.ROLES), set(parsed["agents"]))
+        for role in installer.RETIRED_ROLES:
+            self.assertFalse((agents / f"{role}.toml").exists())
+            backups = list((self.codex / "rightsize-goal/install-backups").glob(f"*/resources/{role}.toml"))
+            self.assertEqual(1, len(backups))
+            self.assertEqual("old role", backups[0].read_text(encoding="utf-8"))
+        for role in ("rightsize-senior-doer", "rightsize-staff-doer"):
+            backups = list((self.codex / "rightsize-goal/install-backups").glob(f"*/resources/{role}.toml"))
+            self.assertEqual(1, len(backups))
+            self.assertEqual("old definition", backups[0].read_text(encoding="utf-8"))
+
     def test_conflict_requires_force_and_forced_copy_is_backed_up(self):
         installer.install(self.args(), self.package, self.codex, self.skills)
         target = self.codex / "agents" / f"{installer.ROLES[0]}.toml"

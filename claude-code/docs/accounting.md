@@ -35,8 +35,7 @@ Two details are handled for you and matter for correctness:
 
 ## The ledger
 
-The ledger defaults to `~/.claude/rightsize-goal/usage.sqlite3`, or the same path under
-`CLAUDE_CONFIG_DIR` when that variable is set. It survives updates. `--db PATH` selects
+The ledger defaults to `<current-directory>/.rightsize-goal/usage.sqlite3`. Each goal has its own `<goal-id>.jsonl` log in that directory, with only `agent_call` and `agent_result` lines. Every call identifies the agent; every result records measured tokens and estimated cost, or explicit unavailable reasons. A retry or escalation links the prior task and states why it was needed. No new Rightsize Goal usage logs are written under the user configuration directory. The local records survive updates. `--db PATH` selects
 another ledger and must precede the subcommand, as must `--claude-dir PATH`.
 
 From the installed skill directory:

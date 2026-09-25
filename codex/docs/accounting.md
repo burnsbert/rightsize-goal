@@ -6,8 +6,7 @@ an exact thread identity and baseline before follow-up work. New child threads
 use an explicit zero baseline. Finished task IDs are idempotent and cannot be
 silently reused or relabeled.
 
-The ledger defaults to `$CODEX_HOME/rightsize-goal/usage.sqlite3` (otherwise
-`~/.codex/rightsize-goal/usage.sqlite3`). It survives copy updates. A command's
+The ledger defaults to `<current-directory>/.rightsize-goal/usage.sqlite3`. Each goal has its own `<goal-id>.jsonl` log in that directory, with only `agent_call` and `agent_result` lines. Every call identifies the agent; every result records measured tokens and estimated cost, or explicit unavailable reasons. A retry or escalation links the prior task and states why it was needed. No new Rightsize Goal usage logs are written under the user configuration directory. The local records survive copy updates. A command's
 `--db PATH` option selects another ledger and must precede its subcommand.
 
 From the installed skill directory:

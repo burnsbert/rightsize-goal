@@ -1,6 +1,6 @@
 # Why these four roles
 
-The Codex implementation of Rightsize Goal uses seven roles across four models. This
+The Codex implementation of Rightsize Goal uses five roles across three models. This
 package originally kept seven, one lower-effort and one higher-effort variant per paid
 model. It was simplified to four: one role per model, each pinned at the documented API
 default of `high`. This document records the reasoning so the ladder can be argued with
@@ -12,8 +12,8 @@ rather than merely inherited.
 | --- | --- | --- | --- |
 | `rightsize-junior-doer` | Claude Haiku 4.5 | not supported | Explicit, low-risk work with an example or prescribed approach |
 | `rightsize-midlevel-doer` | Claude Sonnet 5 | `high` | Bounded work using established project patterns, including moderately complex work needing more judgment |
-| `rightsize-senior-doer` | Claude Opus 5 | `high` | Hard work: ambiguity, unfamiliar integrations, real tradeoffs, deep interacting constraints |
-| `rightsize-principal-doer` | Claude Fable 5.1 | `high` | The hardest unresolved core, only after documented Opus struggle |
+| `rightsize-senior-doer` | Claude Opus 5.5 | `high` | Hard work: ambiguity, unfamiliar integrations, real tradeoffs, deep interacting constraints |
+| `rightsize-principal-doer` | Claude Fable 5.1 | `high` | Break-glass: the hardest unresolved core, only after documented Opus struggle |
 
 Each row is a distinct model. No two roles resolve to the same configuration, which is
 the bar a role has to clear to justify existing.
@@ -25,10 +25,10 @@ does on Codex.
 
 **Model.** Published per-million rates put roughly a tenfold spread between the cheapest
 and most expensive model in the ladder. That is a real gap, but it is much flatter than the
-Codex lineup's, and the difference is not evenly distributed. On Codex the step from Terra to
-Sol is enormous — a mid-tier model to a frontier one, with the price to match — so routing a
-task down a tier there is a decision with large consequences in both directions. The Claude
-equivalent, Sonnet 5 to Opus 5, is a far smaller step in both price and capability. Sonnet 5
+Codex lineup's, and the difference is not evenly distributed. On Codex the step from Luna to
+Sol — its midlevel-to-senior boundary — is twentyfold in per-token price, so routing a task
+down a tier there is a decision with large consequences in both directions. The Claude
+equivalent, Sonnet 5 to Opus 5.5, is a twofold step. Sonnet 5
 is a strong model that handles a great deal of real work, which means the cost of routing it
 wrongly is lower, and so is the saving from routing it downward.
 
@@ -36,16 +36,21 @@ The practical consequence: dropping one model tier saves less than the tier name
 a single rework cycle can erase it. The ladder is not a licence to route everything downward —
 it is a reason to route by task fit and measure the outcome.
 
-**Effort.** Sonnet 5, Opus 5, and Fable 5.1 accept `low` through `max`, and effort changes
-how many tokens a model spends at a fixed rate. Claude Code's session default is `xhigh`; the
-API default is `high`. Every effort-bearing role here runs at that documented default, not
-above it.
+**Effort.** Sonnet 5, Opus 5.5, and Fable 5.1 accept `low` through `max`, and effort changes
+how many tokens a model spends at a fixed rate. Claude Code's session default is `xhigh`.
+Every effort-bearing role here runs at `high`.
 
 The level is not arbitrary. Anthropic's own guidance sets the API default at `high` for
-Sonnet 5, Opus 5, and Fable 5.1, and reserves `xhigh` for "the hardest coding and agentic
-tasks." `xhigh` and `max` are left unused: this workflow is meant to spend less than a
-default session, not more, and an `xhigh` role also wants a large `max_tokens` that agent
-frontmatter cannot set.
+Sonnet 5 and Fable 5.1, and reserves `xhigh` for "the hardest coding and agentic tasks."
+Opus 5.5 is the exception: its API default is `medium`, one level below Opus 5's, and
+Anthropic reports that Opus 5.5 at `medium` beats Opus 5 at `high` on coding and
+knowledge-work evaluations. The senior role still runs at `high`, one level above that
+default, by choice. The senior role's documented struggle is what opens the break-glass
+Fable gate, so that struggle should come from a serious attempt; `high` Opus 5.5 is still
+far cheaper than a Fable escalation. Expect more tokens per senior turn than Opus 5 spent at
+`high`, since Opus 5.5 thinks more per turn at a given level. `xhigh` and `max` are left
+unused: this workflow is meant to spend less than a default session, not more, and an
+`xhigh` role also wants a large `max_tokens` that agent frontmatter cannot set.
 
 This package previously ran a lower-effort variant of each paid model at `medium` alongside
 the `high` variant — Anthropic notes that on Opus 5, *"`low` and `medium` are unusually
@@ -129,16 +134,17 @@ Merging further was considered and rejected:
   and loses Haiku's meaningfully lower dispatch floor (see the measured figures above) for
   work that never needed a `high`-effort Sonnet 5 turn.
 - **Merge midlevel into senior.** Then routine bounded work — the bulk of ordinary
-  engineering — pays Opus rates by default, the largest single price step in the ladder,
-  for work that does not need it.
+  engineering — pays Opus rates by default, twice Sonnet's, for work that does not need
+  it.
 - **Merge senior into principal.** Then every hard task that would have stopped at a
-  documented Opus struggle instead pays Fable rates directly, defeating the escalation
+  documented Opus struggle instead pays Fable rates directly — the largest single price step
+  in the ladder — defeating the escalation
   gate's entire purpose: buying expensive effort only for the portion that is actually
   difficult.
 
 ## Why not more
 
-Sonnet 5, Opus 5, and Fable 5.1 each support five effort levels, so a finer ladder is
+Sonnet 5, Opus 5.5, and Fable 5.1 each support five effort levels, so a finer ladder is
 technically possible. It is not obviously better. Each additional role is a routing
 decision the coordinator has to make and justify in the log, and adjacent effort levels on
 the same model rarely change the right answer. Four roles already give every model tier a
@@ -156,7 +162,7 @@ The role files constrain behavior structurally, not only by instruction:
   and above also get `WebFetch` and `WebSearch`, because research synthesis is explicitly in
   those roles' remit.
 - No role is granted artifact publishing, scheduling, messaging, or goal-state tools. The
-  coordinator alone owns the session goal, the scratch log, and the gate state.
+  coordinator alone owns the session goal, the goal log, and the gate state.
 - Every role is instructed not to commit, push, publish, or send external messages unless
   the assignment explicitly authorizes it.
 

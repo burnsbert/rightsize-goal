@@ -106,6 +106,37 @@ class Fixture(unittest.TestCase):
 
 
 class UsageAccountingTests(Fixture):
+    def test_default_ledger_is_local_to_current_directory(self):
+        with patch("pathlib.Path.cwd", return_value=self.root):
+            self.assertEqual(self.root / ".rightsize-goal" / "usage.sqlite3", usage.default_db())
+
+    def test_log_write_failure_rolls_back_assignment(self):
+        with patch.object(usage, "_append_goal_event", side_effect=OSError("disk full")):
+            self.assertEqual(1, self.start("--new-agent")[0])
+        self.assertEqual(0, self.start("--new-agent")[0])
+
+    def test_goal_log_records_calls_results_retries_and_separate_goals(self):
+        self.write(self.agent_file("a1"), [turn("req-1", inp=100, out=20)])
+        self.assertEqual(0, self.start("--new-agent")[0])
+        self.assertEqual(0, self.finish(outcome="rework")[0])
+        self.assertEqual(1, self.start("--prior-task", "T001", task="T002")[0])
+        self.assertEqual(0, self.start("--prior-task", "T001", "--reason", "acceptance check failed", task="T002")[0])
+        self.write(self.agent_file("a1"), [turn("req-2", inp=10, out=5)], append=True)
+        self.assertEqual(0, self.finish(task="T002")[0])
+        self.assertEqual(0, self.call("start", "--run", "run-2", "--task", "T001", "--project-tag", "proj", "--role", "worker", "--model", "test-model", "--effort", "medium", "--mode", "implement", "--difficulty", "routine", "--agent-id", "a2", "--new-agent", "--tariff", str(self.tariff))[0])
+        log = [json.loads(line) for line in (self.root / "run-1.jsonl").read_text().splitlines()]
+        self.assertEqual(["agent_call", "agent_result", "agent_call", "agent_result"], [e["event"] for e in log])
+        self.assertTrue(all(e["agent"] == "rightsize-midlevel-doer" and e["goal_id"] == "run-1" for e in log))
+        self.assertEqual("acceptance check failed", log[2]["reason"])
+        self.assertEqual("T001", log[2]["prior_task"])
+        self.assertEqual(120, log[1]["tokens"]["total_tokens"])
+        self.assertAlmostEqual((100 + 20 * 16) / 1_000_000, log[1]["estimated_cost_usd"])
+        self.assertEqual(1, len((self.root / "run-2.jsonl").read_text().splitlines()))
+        self.finish(outcome="accepted")
+        self.assertEqual(4, len((self.root / "run-1.jsonl").read_text().splitlines()))
+        self.assertEqual(1, self.call("start", "--run", "../escape", "--task", "T003", "--project-tag", "proj", "--role", "worker", "--model", "test-model", "--effort", "medium", "--mode", "implement", "--difficulty", "routine", "--agent-id", "a3", "--new-agent")[0])
+        self.assertFalse((self.root.parent / "escape.jsonl").exists())
+
     def test_prices_every_category_from_the_transcript(self):
         self.write(self.agent_file("a1"), [
             turn("req-1", inp=1000, read=2000, write_5m=3000, write_1h=4000, out=5000)
