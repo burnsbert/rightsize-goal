@@ -21,9 +21,14 @@ python3 -m unittest discover -s claude-code/tests -p "test_*.py"
 For Claude Code packaging changes, also run:
 
 ```sh
-claude plugin validate .
-claude plugin validate claude-code/
+claude plugin validate --strict .
+claude plugin validate --strict claude-code/
 ```
+
+Any Claude Code change meant to reach existing plugin installs must bump `version` in
+`claude-code/.claude-plugin/plugin.json` (and the root `.claude-plugin/marketplace.json`).
+Installs only update when that version changes; new commits under the same version are
+never delivered.
 
 Use temporary destination directories for installer development, and an isolated
 `CLAUDE_CONFIG_DIR` or `CODEX_HOME` for plugin and runtime experiments. Do not test

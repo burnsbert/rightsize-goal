@@ -123,7 +123,8 @@ at the same role. Dispatch overhead, not model rate, dominates the cost of small
 ## Before tagging
 
 - Run `python3 -m unittest discover -s claude-code/tests -p "test_*.py"` from the root.
-- Run `claude plugin validate .` and `claude plugin validate claude-code/`.
+- Run `claude plugin validate --strict .` and `claude plugin validate --strict claude-code/`
+  (CI runs these too).
 - Observe the complete CI matrix passing, including symlink coverage on a host that permits
   symlinks. Exercise the public shell and PowerShell entry points.
 - Install the plugin from the published GitHub source, not only from a local path, and
@@ -143,9 +144,11 @@ at the same role. Dispatch overhead, not model rate, dominates the cost of small
 - Ensure no credentials, local logs, databases, or private backups enter the release.
 - Include the root MIT `LICENSE`, the docs, the skill helpers and references, and all four
   roles in any downloadable bundle.
-- Update `CHANGELOG.md`, select a version and tag, bump `version` in both
-  `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`, and publish only the
-  tested commit.
+- Update `CHANGELOG.md` and bump `version` in both `claude-code/.claude-plugin/plugin.json`
+  and the root `.claude-plugin/marketplace.json`. Every change that should reach users needs
+  a new version: existing installs compare `plugin.json`'s `version` and ignore new commits
+  under an unchanged one. Publish only the tested commit, then tag it with
+  `claude plugin tag --push` from `claude-code/`, which creates `rightsize-goal--v<version>`.
 
 ## Distribution scope
 

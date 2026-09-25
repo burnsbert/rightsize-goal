@@ -22,6 +22,9 @@ Two commands, from inside Claude Code:
 /plugin install rightsize-goal@rightsize-goal
 ```
 
+To receive updates, enable auto-update for the `rightsize-goal` marketplace under `/plugin` →
+**Marketplaces**, or run `claude plugin update rightsize-goal` from a terminal.
+
 Then start a goal:
 
 ```text

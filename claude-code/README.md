@@ -38,8 +38,10 @@ claude plugin marketplace add burnsbert/rightsize-goal
 claude plugin install rightsize-goal@rightsize-goal
 ```
 
-That is the whole installation. Nothing is copied into your configuration by hand,
-`/plugin update` handles upgrades, and `/plugin uninstall rightsize-goal` removes it.
+That is the whole installation. Nothing is copied into your configuration by hand, and
+`/plugin uninstall rightsize-goal` removes it. Claude Code does not auto-update third-party
+marketplaces by default; see [update and test](#update-and-test) to turn that on or update by
+hand.
 Confirm what landed with `claude plugin details rightsize-goal`, which lists one skill,
 four agents, and the plugin's token cost.
 
@@ -70,6 +72,10 @@ python .\claude-code\install.py --verify
 This copies the skill to `~/.claude/skills/rightsize-goal` and the four role files to
 `~/.claude/agents/`. It writes no settings and changes no existing configuration. Roles
 installed this way are addressed by their bare names, without a prefix.
+
+Use one method, not both. A plugin install and a manual install side by side give you two
+copies of the skill and roles under different names, and the manual copy never receives
+plugin updates.
 
 | Method | Best for | Keep the source directory afterward? |
 | --- | --- | --- |
@@ -176,10 +182,19 @@ See [accounting and local data](docs/accounting.md) for what is measured and wha
 
 ## Update and test
 
-For a plugin install, run `/plugin update rightsize-goal` or
-`claude plugin marketplace update rightsize-goal`. For a symlink install, pulling this
-repository updates the installed files immediately. Copy installs require rerunning the
-installer with `--force`.
+For a plugin install, either turn on auto-update for this marketplace (`/plugin` →
+**Marketplaces** → `rightsize-goal` → **Enable auto-update**) or update by hand:
+
+```sh
+claude plugin update rightsize-goal
+```
+
+That refreshes the marketplace and installs any newer release; restart Claude Code to load
+it. An install only changes when the plugin's `version` changes, so an unchanged version
+reports "already at the latest version" even if the repository has moved on.
+
+For a symlink install, pulling this repository updates the installed files immediately.
+Copy installs require rerunning the installer with `--force`.
 
 Run all deterministic tests from `claude-code/`:
 
@@ -190,9 +205,11 @@ python3 -m unittest discover -s tests -p "test_*.py"
 Validate the packaging from the repository root:
 
 ```sh
-claude plugin validate .
-claude plugin validate claude-code/
+claude plugin validate --strict .
+claude plugin validate --strict claude-code/
 ```
+
+CI runs the same two commands, so a manifest warning fails the build.
 
 The bundled model tariff has a review date. Once it expires, token accounting continues
 while dollar estimates remain unavailable until

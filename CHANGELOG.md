@@ -7,7 +7,11 @@
 - Store the usage ledger and one call/result JSONL log per goal under the current directory's `.rightsize-goal/`; include agent identity, retry reason, measured tokens, and estimated cost, with no new user-wide Rightsize Goal logs.
 - One-step requests use the main Claude Code session without agent dispatch or persistent goal setup.
 - New `claude-code/` implementation, distributed as a Claude Code plugin with a repository
-  marketplace manifest; two commands install it and `/plugin update` maintains it.
+  marketplace manifest; two commands install it and `claude plugin update rightsize-goal`
+  (or marketplace auto-update, off by default for third-party marketplaces) maintains it.
+- Plugin version 1.0.0. Earlier installs were pinned at 0.1.0 and never received changes;
+  run `claude plugin update rightsize-goal` once to move to 1.0.0. Every later user-facing
+  change bumps the version, and CI runs `claude plugin validate --strict`.
 - Four subagent roles across Claude Haiku 4.5, Sonnet 5, Opus 5.5, and Fable 5.1 (one role per
   model, each paid role at `high` effort), each pinning model and effort, since the Agent
   tool has no dispatch-time effort override. Simplified before first release from an

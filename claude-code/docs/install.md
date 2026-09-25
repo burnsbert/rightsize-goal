@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | Commands to run | two | one, plus a clone |
 | Needs Python to install | no | yes, 3.11+ |
-| Updates | `/plugin update rightsize-goal` | rerun with `--force` |
+| Updates | auto-update if enabled, or `claude plugin update rightsize-goal` | rerun with `--force` |
 | Uninstall | `/plugin uninstall rightsize-goal` | manual file removal |
 | Skill command | `/rightsize-goal:rightsize-goal` | `/rightsize-goal` |
 | Role names | `rightsize-goal:rightsize-...` | `rightsize-...` |
@@ -14,6 +14,10 @@
 
 Both install the same skill and the same four roles. The helper scripts need Python 3.11+
 at run time either way; the plugin route just does not need it to install.
+
+Pick one. Installing both ways gives you two copies of the skill and roles under different
+names (`rightsize-goal:rightsize-junior-doer` and `rightsize-junior-doer`), and the manual
+copy never receives plugin updates. To switch methods, uninstall the old one first.
 
 ## Plugin installation
 
@@ -38,6 +42,10 @@ tab surfaces loading problems.
 
 `--scope user` is the default. Use `--scope project` to install for one repository, which
 is worth doing when a team should share the same roles.
+
+Claude Code auto-updates only Anthropic's own marketplaces by default. To keep this plugin
+current, open `/plugin`, go to **Marketplaces**, select `rightsize-goal`, and choose
+**Enable auto-update**, or update by hand as described [below](#update-conflicts-and-recovery).
 
 ## Manual installation
 
@@ -145,8 +153,12 @@ own startup cost.
 For a plugin install:
 
 ```sh
-claude plugin marketplace update rightsize-goal
+claude plugin update rightsize-goal
 ```
+
+This refreshes the marketplace and installs the newer release if there is one; restart Claude
+Code to load it. Claude Code compares the plugin's declared `version`, so it reports "already at
+the latest version" until a release bumps that number, however many commits have landed.
 
 For a copy install, pull the desired tag or commit and rerun:
 

@@ -31,3 +31,13 @@ jobs:
         shell: pwsh
         run: ./claude-code/install.ps1 -?
 
+  plugin-manifests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install -g @anthropic-ai/claude-code
+      - run: claude plugin validate --strict .
+      - run: claude plugin validate --strict claude-code/
