@@ -10,7 +10,8 @@ This repository is organized by host. Each implementation documents its own mode
 installation, and limitations; neither assumes the other's APIs.
 
 - [`claude-code/`](claude-code/) — the Claude Code implementation: a plugin with one skill
-  and four subagent roles across Haiku 4.5, Sonnet 5, Opus 5.5, and Fable 5.1.
+  and five subagent roles across Haiku 4.5, Sonnet 5, Opus 5.5, and Fable 5.1, including an
+  independent validator.
 - [`codex/`](codex/) — the Codex implementation: a skill, five agent roles, and installers.
 
 ## Claude Code
@@ -29,23 +30,24 @@ To receive updates, enable auto-update for the `rightsize-goal` marketplace unde
 
 ### Use
 
-Open Claude Code in the project you want to change. Choose a capable coordinator,
-then set a session goal that tells Claude to use Rightsize Goal:
+Open Claude Code in the project you want to change, choose a capable coordinator, and
+give it the goal:
 
 ```text
 /model opus
 /effort medium
-/goal Use the rightsize-goal skill to add CSV export to the reports page. The export must match the active filters and its tests must pass.
+/rightsize-goal:rightsize-goal Add CSV export to the reports page. The export must match the active filters and its tests must pass.
 ```
 
-`/goal` keeps the session working toward the stated condition. Naming the skill
-in the goal asks Claude to load and follow it. To invoke the plugin skill
-directly instead, use `/rightsize-goal:rightsize-goal`; for a manual skill
-install, use `/rightsize-goal`.
+The plugin keeps the session working until an independent validator confirms the goal is
+met: the persistence of `/goal`, with each task routed to the cheapest capable model. Say
+"pause" to stop and "resume" to pick it back up. Running it under Claude Code's own
+`/goal Use the rightsize-goal skill to ...` also works, and a manual skill install
+(`/rightsize-goal`) relies on that for persistence.
 
 See the [Claude Code guide](claude-code/README.md) for a manual install, the role table,
 and how to check model access. [Usage](claude-code/docs/usage.md) covers acceptance
-criteria, `/goal`, time bounds, stopping, and resuming. [Why these four
+criteria, persistence, time bounds, pausing, and resuming. [Why these
 roles](claude-code/docs/roles.md) explains the tier boundaries.
 [Accounting](claude-code/docs/accounting.md) explains what is measured and what stays local.
 

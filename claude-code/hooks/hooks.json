@@ -1,0 +1,16 @@
+{
+  "description": "Keeps a self-driving rightsize-goal run working until its validator returns DONE, the goal is paused, or a limit is reached. Silent in sessions without an active goal.",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/skills/rightsize-goal/scripts/drive.py\" hook || python \"${CLAUDE_PLUGIN_ROOT}/skills/rightsize-goal/scripts/drive.py\" hook || py -3 \"${CLAUDE_PLUGIN_ROOT}/skills/rightsize-goal/scripts/drive.py\" hook",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

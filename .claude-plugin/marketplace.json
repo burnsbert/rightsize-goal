@@ -5,13 +5,13 @@
   },
   "metadata": {
     "description": "Cost-aware goal workflows that delegate to the lowest capable model tier.",
-    "version": "1.0.2"
+    "version": "1.1.0"
   },
   "plugins": [
     {
       "name": "rightsize-goal",
       "source": "./claude-code",
-      "description": "Pursue a goal with a small engineering team: route each bounded task to the lowest-cost Claude tier likely to succeed, verify results, and learn from measured usage."
+      "description": "Pursue a goal until an independent validator confirms it is done, with a small engineering team: route each task to the lowest-cost Claude tier likely to succeed, verify results, and learn from measured usage."
     }
   ]
 }

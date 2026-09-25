@@ -1,5 +1,27 @@
 # Claude Code release checks
 
+## 1.1.0 verification — September 25, 2026
+
+1.1.0 adds self-driving persistence: a plugin Stop hook (`hooks/hooks.json`, running
+`drive.py hook`) and the read-only `rightsize-validator` role. The suite and both strict
+manifest validations pass. An isolated `CLAUDE_CONFIG_DIR` install reported one skill, five
+agents, and one Stop hook.
+
+The hook was exercised live on Claude Code `2.1.282`, loading the working tree with
+`--plugin-dir` and Haiku as the session model, in disposable projects with a goal pre-bound
+to a known `--session-id`:
+
+- With an unvalidated goal and all tools disabled, so no progress could be recorded, the
+  session transcript shows three "Stop hook feedback" continuations carrying the goal, the
+  unmet items, and the open task, followed by an unblocked stop: the no-progress release.
+  The model's final reply referred to the task it only learned about from the hook.
+- With a fresh DONE verdict recorded, the session finished in one turn.
+- A different session in the same directory finished in one turn and left the bound goal's
+  hook counters untouched.
+
+Not yet observed live: a complete coordinator-driven run that dispatches workers, then the
+validator, and ends on its DONE verdict; and the hook under Agent Teams.
+
 ## 1.0.1 verification — September 24, 2026
 
 The plugin and marketplace manifests both declare 1.0.1. The local suite and
@@ -138,22 +160,24 @@ at the same role. Dispatch overhead, not model rate, dominates the cost of small
 - Observe the complete CI matrix passing, including symlink coverage on a host that permits
   symlinks. Exercise the public shell and PowerShell entry points.
 - Install the plugin from the published GitHub source, not only from a local path, and
-  confirm `claude plugin details rightsize-goal` lists one skill and four agents.
+  confirm `claude plugin details rightsize-goal` lists one skill, five agents, and one Stop
+  hook.
 - Install from a clean source archive with `install.py` and confirm `--verify` passes.
-- Start a fresh session and confirm the skill and all four roles load under both install
+- Start a fresh session and confirm the skill and all five roles load under both install
   methods, including the `rightsize-goal:` prefix under the plugin.
 - Run a small goal in a disposable project. Confirm suitable delegation, verified
   acceptance, a saved log and gate, and honest usage results — available, or an explained
   gap.
-- Test a requested stop and a resumed run using the same gate. Check `/goal` set, held,
-  and self-cleared.
+- Test a requested pause and a resumed run using the same goal. Confirm the plugin hook
+  holds an unvalidated goal open, releases on a fresh DONE, a pause, or a reached limit, and
+  stands down under `/goal`. Check `/goal` set, held, and self-cleared.
 - Check model availability on the intended account. Never infer it from API prices.
 - Recheck tariff expiry and the linked rates, including the cache-write multipliers. Change
   the tariff version when rates change; do not rewrite historical ledger snapshots.
 - Confirm `role_models` in the tariff still matches every role file's `model` alias.
 - Ensure no credentials, local logs, databases, or private backups enter the release.
-- Include the root MIT `LICENSE`, the docs, the skill helpers and references, and all four
-  roles in any downloadable bundle.
+- Include the root MIT `LICENSE`, the docs, the skill helpers and references, the hook, and
+  all five roles in any downloadable bundle.
 - Update `CHANGELOG.md` and bump `version` in both `claude-code/.claude-plugin/plugin.json`
   and the root `.claude-plugin/marketplace.json`. Every change that should reach users needs
   a new version: existing installs compare `plugin.json`'s `version` and ignore new commits

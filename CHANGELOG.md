@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.1.0 — 2026-09-25
+
+### Claude Code
+
+- Self-driving persistence under a plugin install: `/rightsize-goal:rightsize-goal <goal>`
+  keeps working like `/goal` would, without typing `/goal`. A plugin Stop hook, with no model
+  call, holds the session open while it owns an active goal, and feeds back what is unmet and
+  which tasks are open. It releases on a fresh DONE verdict, a pause, waiting on the user, a
+  reached limit, or several continuations without recorded progress, and lets the coordinator
+  wait quietly while workers are running. Its message includes the exact `drive.py` commands.
+  It stays silent in every other session and stands down when `/goal` drives.
+- New read-only `rightsize-validator` role (Opus 5.5, high). The coordinator decides when it
+  believes the goal is done; the validator checks the current goal from its own evidence and
+  returns DONE or NOT DONE. Each NOT DONE reason becomes a task, and a repeated reason forces
+  a change of approach or tier.
+- New `drive.py` helper for the goal text and the user's amendments, the living task list,
+  validation verdicts, and pause, resume, and waiting status. An amendment or later work makes
+  an earlier DONE stale. "Stop" or "pause" pauses, and "resume" continues in the same or a
+  later session.
+- Manual installs have no hook and keep using `/goal` for persistence.
+- Task a goal out the way a capable development team would, using how a tech lead would
+  ticket it for real engineers to choose task boundaries and owners.
+
+### Codex
+
+- Task a goal out the way a capable development team would, using how a tech lead would
+  ticket it for real engineers to choose task boundaries and owners. Bump the Codex plugin to
+  1.1.0 so installed copies receive it.
+
 ## 1.0.2 — 2026-09-24
 
 ### Claude Code

@@ -10,6 +10,8 @@ installation, and limitations. Do not assume one host exposes the other's APIs, 
 import across the two directories — a Claude Code plugin is cached on install, so a path
 that leaves `claude-code/` breaks after installation. `goal_gate.py` is host-independent and
 is therefore duplicated in both packages rather than shared; keep the copies in step.
+`claude-code/.../scripts/drive.py` and the plugin's Stop hook are Claude Code only: Codex can
+start its own goal process from a skill, so it has no equivalent and none should be added.
 The Codex plugin also keeps a packaged skill copy under `codex/skills/`; keep it in sync
 with `codex/.agents/skills/`, which is the source used by the manual installer.
 

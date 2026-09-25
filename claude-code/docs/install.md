@@ -12,7 +12,7 @@
 | Role names | `rightsize-goal:rightsize-...` | `rightsize-...` |
 | Custom config directory | follows `CLAUDE_CONFIG_DIR` | `--claude-dir PATH` |
 
-Both install the same skill and the same four roles. The helper scripts need Python 3.11+
+Both install the same skill and the same five roles. The helper scripts need Python 3.11+
 at run time either way; the plugin route just does not need it to install.
 
 Pick one. Installing both ways gives you two copies of the skill and roles under different
@@ -36,17 +36,20 @@ instead of GitHub, point the marketplace at the clone with a path that starts wi
 claude plugin marketplace add ./rightsize-goal
 ```
 
-Check the result with `claude plugin details rightsize-goal`. It should report one skill
-and four agents. `claude plugin list` shows what is installed, and the `/plugin` **Errors**
+Check the result with `claude plugin details rightsize-goal`. It should report one skill,
+five agents, and one Stop hook. `claude plugin list` shows what is installed, and the `/plugin` **Errors**
 tab surfaces loading problems.
 
-To start a substantial run, use `/goal` and name the skill in the condition:
+To start a substantial run, invoke the skill with the goal:
 
 ```text
-/goal Use the rightsize-goal skill to add regression tests for the parser. Cover invalid input and defaults; all existing tests must pass.
+/rightsize-goal:rightsize-goal Add regression tests for the parser. Cover invalid input and defaults; all existing tests must pass.
 ```
 
-See [usage](usage.md) for scope, limits, and direct skill invocation.
+The plugin's Stop hook keeps a run like this working until its validator confirms the goal.
+The hook is silent in any session that does not own an active goal, makes no model call, and
+does not run at all when hooks are disabled with `disableAllHooks`. See [usage](usage.md) for
+how it decides, and for scope, limits, pausing, and resuming.
 
 `--scope user` is the default. Use `--scope project` to install for one repository, which
 is worth doing when a team should share the same roles.
@@ -83,7 +86,7 @@ sh claude-code/install.sh --verify
 | Resource | Default destination |
 | --- | --- |
 | Skill, references, helpers | `~/.claude/skills/rightsize-goal/` |
-| Four `rightsize-*-doer.md` role files | `~/.claude/agents/` |
+| Five role files (`rightsize-*-doer.md`, `rightsize-validator.md`) | `~/.claude/agents/` |
 | Usage ledger and goal logs created during runs | `<current-directory>/.rightsize-goal/` |
 | Replacement backups | `~/.claude/rightsize-goal/install-backups/<timestamp>/` |
 
@@ -152,7 +155,7 @@ runs its teammates at `medium`, including the senior Opus role.
 A teammate is a whole session rather than a lightweight helper, so it loads its own project
 instructions and orients itself before touching the work you assigned. Its floor cost per
 dispatch is therefore several times a plain subagent's — see
-[why these four roles](roles.md#what-a-dispatch-actually-costs) for measured figures. Bundle
+[why these roles](roles.md#what-a-dispatch-actually-costs) for measured figures. Bundle
 related work into one assignment rather than spawning a teammate for something smaller than its
 own startup cost.
 
@@ -194,7 +197,7 @@ not appear.
 Plugin: `/plugin uninstall rightsize-goal`, then
 `/plugin marketplace remove rightsize-goal` if you no longer want the marketplace entry.
 
-Manual install: remove `rightsize-goal` from the installed skills directory and these four
+Manual install: remove `rightsize-goal` from the installed skills directory and these five
 files from the installed agents directory.
 
 ```text
@@ -202,6 +205,7 @@ rightsize-junior-doer.md
 rightsize-midlevel-doer.md
 rightsize-senior-doer.md
 rightsize-principal-doer.md
+rightsize-validator.md
 ```
 
 For symlink installs, remove the links themselves, not their targets. There is no automated
@@ -213,7 +217,7 @@ By default, keep the backups and each project's `.rightsize-goal/` records. Dele
 
 - **Skill or roles missing.** Run `claude plugin details rightsize-goal` for a plugin
   install, or `install.py --verify` for a manual one. Check `/plugin` → Errors. Start a
-  fresh session. Installing only the skill with a generic skill installer omits the four
+  fresh session. Installing only the skill with a generic skill installer omits the five
   roles, and the workflow will refuse to substitute a default agent for them.
 - **"Agent type not found".** Under a plugin install the roles need the
   `rightsize-goal:` prefix. Read the available-agents list and use the exact string.
@@ -224,10 +228,19 @@ By default, keep the backups and each project's `.rightsize-goal/` records. Dele
 - **Model unavailable.** Check `/model`, or probe with
   `claude --model fable -p 'Reply with exactly: OK'`. Installing a role does not grant
   access. Do not silently repoint a role at a different model: see
-  [why these four roles](roles.md#changing-the-ladder) for the three files that must stay
+  [why these roles](roles.md#changing-the-ladder) for the three files that must stay
   consistent.
+- **The session stops before the goal is done.** Under a plugin install, check that the goal
+  is still active (`drive.py show --drive .rightsize-goal/<goal-id>.drive.json`), bound to the
+  current session (say "resume" to rebind it), and that `disableAllHooks` is not set. After
+  several continuations with no recorded progress, the hook deliberately lets the session stop.
+  It also lets the session wait quietly while any task is `in_progress`; if a worker died
+  without reporting back, say "resume" or tell the coordinator to recheck its tasks. The hook
+  needs Python on the path as `python3`, `python`, or the Windows `py` launcher; if none
+  resolves, it cannot run.
 - **`/goal` refuses to run.** It needs a trusted workspace and unrestricted hooks. Work can
-  still proceed without it; only the automatic hold on session stop is lost.
+  still proceed without it; under a manual install, only the automatic hold on session stop
+  is lost.
 - **Python not found or too old.** Install Python 3.11+ and select the right interpreter.
   Only the two helper scripts need it, so the skill can still guide work without them —
   but the completion gate and the usage ledger will be unavailable, and the coordinator

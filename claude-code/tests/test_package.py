@@ -67,6 +67,28 @@ class PackageTests(unittest.TestCase):
                 priced = tariff["role_models"][fields["name"]]
                 self.assertIn(priced, tariff["models"])
 
+    def test_stop_hook_runs_the_shipped_drive_script_from_the_plugin_root(self):
+        hooks = json.loads((PACKAGE / "hooks/hooks.json").read_text(encoding="utf-8"))
+        stop = hooks["hooks"]["Stop"]
+        commands = [hook["command"] for group in stop for hook in group["hooks"] if hook["type"] == "command"]
+        self.assertEqual(1, len(commands))
+        scripts = re.findall(r'"\$\{CLAUDE_PLUGIN_ROOT\}/([^"]+)" hook', commands[0])
+        self.assertEqual(3, len(scripts), commands[0])
+        # python3 first, then python, then the Windows py launcher.
+        interpreters = [part.strip().split(' "')[0] for part in commands[0].split("||")]
+        self.assertEqual(["python3", "python", "py -3"], interpreters)
+        for script in scripts:
+            self.assertEqual("skills/rightsize-goal/scripts/drive.py", script)
+            self.assertTrue((PACKAGE / script).is_file())
+        self.assertNotIn("hooks", {path.name for path in (PACKAGE / ".claude-plugin").iterdir()})
+
+    def test_validator_is_read_only(self):
+        fields = installer.frontmatter(PACKAGE / "agents/rightsize-validator.md")
+        granted = {item.strip() for item in fields["tools"].split(",")}
+        self.assertFalse(granted & {"Write", "Edit", "MultiEdit", "NotebookEdit", "Agent", "Task"})
+        self.assertIn("Bash", granted)
+        self.assertEqual("opus", fields["model"])
+
     def test_workers_cannot_spawn_agents(self):
         # The escalation gate depends on workers never dispatching for themselves.
         for name in installer.ROLES:

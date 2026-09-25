@@ -1,10 +1,11 @@
-# Why these four roles
+# Why these roles
 
 The Codex implementation of Rightsize Goal uses five roles across three models. This
-package originally kept seven, one lower-effort and one higher-effort variant per paid
-model. It was simplified to four: one role per model, each pinned at the documented API
-default of `high`. This document records the reasoning so the ladder can be argued with
-rather than merely inherited.
+package originally kept seven worker roles, one lower-effort and one higher-effort variant
+per paid model. It was simplified to four: one role per model, each pinned at the documented
+API default of `high`. A fifth role, the validator, judges completion rather than doing work.
+This document records the reasoning so the ladder can be argued with rather than merely
+inherited.
 
 ## The ladder
 
@@ -15,8 +16,25 @@ rather than merely inherited.
 | `rightsize-senior-doer` | Claude Opus 5.5 | `high` | Hard work: ambiguity, unfamiliar integrations, real tradeoffs, deep interacting constraints |
 | `rightsize-principal-doer` | Claude Fable 5.1 | `high` | Break-glass: the hardest unresolved core, only after documented Opus struggle |
 
-Each row is a distinct model. No two roles resolve to the same configuration, which is
-the bar a role has to clear to justify existing.
+Each row is a distinct model. No two worker roles resolve to the same configuration, which
+is the bar a worker role has to clear to justify existing.
+
+## The validator
+
+| Role | Model | Effort | Job |
+| --- | --- | --- | --- |
+| `rightsize-validator` | Claude Opus 5.5 | `high` | Decide whether the current goal is met, from its own evidence |
+
+The coordinator decides when it thinks the goal is done; the validator decides whether it is.
+It shares the senior role's model and effort, which the "distinct configuration" bar above
+would forbid for a worker, because it is not a worker: it is read-only, it does no
+implementation, and its instructions are the opposite of a doer's. It receives the goal text
+and where to look, never the coordinator's argument that the work is finished, and it runs
+the acceptance checks itself.
+
+It runs on Opus because a wrong DONE is the expensive mistake. It ends the goal while work
+remains. The validator only runs when the coordinator claims completion, so the premium is
+paid rarely.
 
 ## Two levers, not one
 
@@ -157,10 +175,12 @@ The role files constrain behavior structurally, not only by instruction:
 
 - **No role is granted the `Agent` or `Task` tool.** Workers cannot spawn agents, so the
   escalation gate cannot be bypassed by a worker escalating itself. A packaged test
-  asserts this for all four files.
-- Every role gets `Read, Glob, Grep, Bash, Write, Edit, MultiEdit`. `rightsize-midlevel-doer`
-  and above also get `WebFetch` and `WebSearch`, because research synthesis is explicitly in
-  those roles' remit.
+  asserts this for every role file.
+- Every worker role gets `Read, Glob, Grep, Bash, Write, Edit, MultiEdit`.
+  `rightsize-midlevel-doer` and above also get `WebFetch` and `WebSearch`, because research
+  synthesis is explicitly in those roles' remit.
+- `rightsize-validator` gets only `Read, Glob, Grep, Bash`: enough to run checks and read the
+  work, with no file-editing tools. A packaged test asserts it stays that way.
 - No role is granted artifact publishing, scheduling, messaging, or goal-state tools. The
   coordinator alone owns the session goal, the goal log, and the gate state.
 - Every role is instructed not to commit, push, publish, or send external messages unless

@@ -27,6 +27,7 @@ ROLES = (
     "rightsize-midlevel-doer",
     "rightsize-senior-doer",
     "rightsize-principal-doer",
+    "rightsize-validator",
 )
 
 SKILL = "rightsize-goal"
