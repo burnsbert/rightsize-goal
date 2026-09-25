@@ -9,13 +9,17 @@ When invoked for a short self-contained request, the skill handles it in the mai
 thread and skips agents, accounting, and persistent goal setup. A current-time
 lookup or trivial localized edit is an example. Explicit `/goal`, time or
 iteration bounds, and requests to resume a run use the persistent workflow.
+For substantial work, direct `Use $rightsize-goal ...` starts a native goal when
+goal tools are available. `/goal Use $rightsize-goal ...` is also a valid way to
+start one explicitly.
 
 ## Examples
 
-Implementation:
+Implementation (invoke the skill directly; it starts a native goal when goal
+tools are available):
 
 ```text
-/goal Use $rightsize-goal to add CSV export to the existing reports page.
+Use $rightsize-goal to add CSV export to the existing reports page.
 Acceptance: exported rows match the active filters, quoting is correct, and tests pass.
 Preserve the current API. Do not publish or deploy.
 ```

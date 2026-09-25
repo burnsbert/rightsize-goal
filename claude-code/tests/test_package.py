@@ -32,6 +32,7 @@ class PackageTests(unittest.TestCase):
         marketplace = json.loads((REPO / ".claude-plugin/marketplace.json").read_text(encoding="utf-8"))
         self.assertEqual("rightsize-goal", plugin["name"])
         self.assertTrue(plugin["version"].strip())
+        self.assertEqual(plugin["version"], marketplace["metadata"]["version"])
         self.assertTrue(plugin["description"].strip())
         entries = [item for item in marketplace["plugins"] if item["name"] == plugin["name"]]
         self.assertEqual(1, len(entries), "marketplace must list the plugin exactly once")

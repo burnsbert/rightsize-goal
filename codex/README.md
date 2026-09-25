@@ -92,7 +92,8 @@ Acceptance: cover invalid input and defaults; all existing tests pass.
 Scope: tests only; do not change production code.
 ```
 
-If your host supports `/goal`, prefix the request with it for native continuation.
+The skill starts a native goal for substantial work when goal tools are available.
+`/goal Use $rightsize-goal to <objective>` is also a valid explicit entry point.
 For work that actually needs time bounds:
 
 ```text

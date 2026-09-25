@@ -112,29 +112,30 @@ prices whatever model actually served the request.
 
 ## Run
 
-How you invoke the skill depends on how you installed it:
+For a substantial objective, start with `/goal` and tell Claude to use the
+Rightsize Goal skill. This sets the session completion condition and starts the
+work in one command. Choose a capable coordinator first:
+
+```text
+/model opus
+/effort medium
+
+/goal Use the rightsize-goal skill to add regression tests for this project's configuration parser. Cover invalid input and defaults; all existing tests must pass. Change tests only, not production code.
+```
+
+You can also invoke the skill directly. The command name depends on how you
+installed it:
 
 | Install | Command |
 | --- | --- |
 | Plugin | `/rightsize-goal:rightsize-goal` |
 | Manual (`install.py`) | `/rightsize-goal` |
 
-The examples below use the plugin form. Substitute the bare form for a manual install; the
-arguments are identical either way, and autocomplete after `/rightsize` shows whichever one
-is live.
-
-The coordinator needs enough judgment to route and verify, not a specific model. Opus at
-`medium` and Sonnet 5 at `high` are both good choices; Haiku is not suitable for this role.
-Set it for the session, then invoke the skill:
-
-```text
-/model opus
-/effort medium
-
-/rightsize-goal:rightsize-goal Add regression tests for this project's configuration parser.
-Acceptance: cover invalid input and defaults; all existing tests pass.
-Scope: tests only; do not change production code.
-```
+Autocomplete after `/rightsize` shows whichever direct command is live. When a
+direct invocation needs a session goal and cannot propose one, the skill gives
+you a complete `/goal Use the rightsize-goal skill to ...` command to paste.
+Opus at `medium` and Sonnet 5 at `high` are capable coordinators; Haiku is not
+suitable for this role.
 
 For work that genuinely needs time bounds:
 
@@ -150,11 +151,11 @@ incomplete handoff if acceptance remains unmet. Time means elapsed wall-clock ti
 including pauses, not active work or billed compute. A skill is not a watchdog or a
 spending cap. No bounds apply by default.
 
-To hold the session open until the work is actually done, set a session goal as well.
-The coordinator will offer one; you can also type it yourself:
+For a direct skill invocation, the coordinator offers a session goal when it can.
+If it cannot, use the complete prompt it provides, for example:
 
 ```text
-/goal the parser regression is reproduced, fixed, and covered by a passing test
+/goal Use the rightsize-goal skill to reproduce and fix the parser regression. A passing regression test must cover the fix.
 ```
 
 See [usage examples, stop and resume, and limitations](docs/usage.md).

@@ -1,5 +1,15 @@
 # Claude Code release checks
 
+## 1.0.1 verification — September 24, 2026
+
+The plugin and marketplace manifests both declare 1.0.1. The local suite and
+both strict manifest validations pass. An isolated `CLAUDE_CONFIG_DIR` install
+reported one skill and four agents. A live `/goal Use the rightsize-goal skill ...`
+run was attempted in a disposable project, but the isolated configuration was
+not logged in; Claude Code returned `Not logged in · Please run /login` before
+the workflow started. Skill invocation through that wording remains unverified
+in a live authenticated session.
+
 ## Role ladder changed since this review — re-verify before tagging
 
 On September 8, 2026, the role ladder was simplified from seven roles (a `medium`- and a

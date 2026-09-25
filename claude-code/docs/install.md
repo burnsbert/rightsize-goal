@@ -8,7 +8,7 @@
 | Needs Python to install | no | yes, 3.11+ |
 | Updates | auto-update if enabled, or `claude plugin update rightsize-goal` | rerun with `--force` |
 | Uninstall | `/plugin uninstall rightsize-goal` | manual file removal |
-| Skill command | `/rightsize-goal:rightsize-goal` | `/rightsize-goal` |
+| Direct skill command | `/rightsize-goal:rightsize-goal` | `/rightsize-goal` |
 | Role names | `rightsize-goal:rightsize-...` | `rightsize-...` |
 | Custom config directory | follows `CLAUDE_CONFIG_DIR` | `--claude-dir PATH` |
 
@@ -39,6 +39,14 @@ claude plugin marketplace add ./rightsize-goal
 Check the result with `claude plugin details rightsize-goal`. It should report one skill
 and four agents. `claude plugin list` shows what is installed, and the `/plugin` **Errors**
 tab surfaces loading problems.
+
+To start a substantial run, use `/goal` and name the skill in the condition:
+
+```text
+/goal Use the rightsize-goal skill to add regression tests for the parser. Cover invalid input and defaults; all existing tests must pass.
+```
+
+See [usage](usage.md) for scope, limits, and direct skill invocation.
 
 `--scope user` is the default. Use `--scope project` to install for one repository, which
 is worth doing when a team should share the same roles.

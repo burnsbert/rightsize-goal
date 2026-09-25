@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.1 — 2026-09-24
+
+### Claude Code
+
+- Recommend starting substantial runs with `/goal Use the rightsize-goal skill to ...`; when a direct skill invocation needs redirection, provide that complete prompt with the user's acceptance conditions and constraints. Bump the plugin to 1.0.1 so installed copies can receive the change.
+
+### Codex
+
+- Clarify direct `$rightsize-goal` invocation as the default usage path and align the Codex plugin version with the 1.0.1 repository release.
+
 ## 1.0.0 — 2026-09-24
 
 ### Claude Code

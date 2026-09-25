@@ -25,7 +25,20 @@ coordinator can send follow-up assignments to a warm worker. Without it, each di
 fresh in-process subagent and the coordinator bundles related work more aggressively instead.
 Both modes are supported; see [Agent Teams](install.md#agent-teams-recommended).
 
-## Invoking the skill
+## Start a substantial goal
+
+Use `/goal` as the entry point and name the skill in the condition:
+
+```text
+/goal Use the rightsize-goal skill to add CSV export to the reports page. The export must match the active filters, quoting must be correct, and tests must pass. Preserve the current API; do not publish or deploy.
+```
+
+Claude Code starts working toward the condition immediately. If you invoke the
+skill directly and it cannot propose a session goal, it gives you a complete
+`/goal Use the rightsize-goal skill to ...` prompt to paste with your objective,
+acceptance conditions, and constraints.
+
+## Invoking the skill directly
 
 The command name depends on the install method: `/rightsize-goal:rightsize-goal` under a
 plugin, `/rightsize-goal` under a manual `install.py` install. The examples below use the
@@ -76,10 +89,11 @@ separate evaluator agrees the condition is met, then the goal clears itself. It 
 closest thing to persistence this host offers, and it pairs well with this workflow.
 
 ```text
-/goal the CSV export matches the active filters and the export test suite passes
+/goal Use the rightsize-goal skill to add CSV export to the reports page. The export must match the active filters and the export test suite must pass.
 ```
 
-The coordinator will offer to set one for you when it can. Three things are worth knowing:
+The coordinator offers to set one if you invoke the skill directly and the
+goal proposal tool is available. Three things are worth knowing:
 
 - It is **session-scoped**. It does not schedule work in a future session. For that, look
   at `/loop` or `/schedule`, which are separate features with their own cost behavior.
