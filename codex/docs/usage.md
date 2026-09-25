@@ -57,6 +57,10 @@ The coordinator records the objective and acceptance conditions, inspects any
 existing native goal, creates a unique local log and completion gate, then assigns
 bounded work to suitable agents. It verifies receipts, records accepted results
 or rework, and escalates when justified. The role table is in the [Codex README](../README.md).
+It keeps a short, revisable view of upcoming tasks and adjusts their boundaries
+as evidence arrives. A task has a coherent outcome and checkpoint; many simple
+repeated steps may share one task, while uncertain implementation and live
+evaluation may need separate assignments.
 
 Each `.rightsize-goal/<goal-id>.jsonl` log contains only agent calls and results, including agent identity, measured tokens, estimated cost, and reasons for retries. The matching `.state.json` holds current objective and evidence; `.gate.json` retains time bounds and evaluated iteration count. The coordinator adds `.rightsize-goal/` to the project's local Git exclusion when applicable. Do not commit logs containing private work.
 

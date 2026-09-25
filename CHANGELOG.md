@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.2 — 2026-09-24
+
+### Claude Code
+
+- Keep a revisable view of pending tasks, split work at consequential checkpoints, and keep simple repetitive operations together without making assignments unmanageably broad.
+
+### Codex
+
+- Choose manageable task boundaries from the current evidence, revise pending tasks after each result, and split work at consequential checkpoints while keeping simple repetitive operations together.
+
 ## 1.0.1 — 2026-09-24
 
 ### Claude Code

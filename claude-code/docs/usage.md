@@ -111,6 +111,10 @@ For a persistent run, the coordinator records the objective and acceptance condi
 available in this session, creates a unique local log and completion gate, then assigns
 bounded work to suitable roles. It verifies receipts, records accepted results or rework,
 and escalates when justified.
+It keeps a short, revisable view of upcoming tasks and adjusts their boundaries
+as evidence arrives. A task has a coherent outcome and checkpoint; many simple
+repeated steps may share one task, while uncertain implementation and live
+evaluation may need separate assignments.
 
 Each worker gets its own subagent transcript, so the accounting helper measures each
 assignment directly rather than dividing up a session total. Each `.rightsize-goal/<goal-id>.jsonl` log contains only agent calls and results, including agent identity, measured tokens, estimated cost, and reasons for retries. The matching `.state.json` holds current objective and evidence; `.gate.json` retains the time bounds and evaluated iteration count. The coordinator adds `.rightsize-goal/` to the project's local Git exclusion when applicable.
