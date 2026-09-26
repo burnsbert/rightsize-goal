@@ -136,6 +136,90 @@ class TaskUsageTests(unittest.TestCase):
         self.assertEqual(result["tariff_version"], "test-v1")
         self.assertIn("UTC", result["recorded_at"])
 
+    def _tokens_with_context(self, total_input, last_input, window=None):
+        # Cumulative counters stay monotonic with the setUp event (output 30, cached 20, reasoning 10).
+        info = {"total_token_usage": {"input_tokens": total_input, "cached_input_tokens": 20,
+                                      "cache_write_input_tokens": 0, "output_tokens": 40,
+                                      "reasoning_output_tokens": 10, "total_tokens": total_input + 40},
+                "last_token_usage": {"input_tokens": last_input, "cached_input_tokens": 0,
+                                     "output_tokens": 10, "reasoning_output_tokens": 0}}
+        if window is not None:
+            info["model_context_window"] = window
+        self._append({"type": "event_msg", "payload": {"type": "token_count", "info": info}})
+
+    def test_finish_reports_the_workers_context_size_at_the_end(self):
+        self.assertEqual(self._start()[0], 0)
+        self._tokens_with_context(5_000, 2_000, window=258_400)
+        self._tokens_with_context(9_000, 4_000, window=258_400)
+        code, result = self._call("finish", "--run", "run-1", "--task", "task-1", "--outcome", "accepted")
+        self.assertEqual(code, 0)
+        self.assertEqual(4_000, result["context_tokens"])
+        self.assertEqual(258_400, result["context_window"])
+        self.assertNotIn("fresh", result["context_advice"])
+        logged = [json.loads(line) for line in (self.db.parent / "run-1.jsonl").read_text().splitlines()]
+        self.assertEqual(4_000, logged[-1]["context_tokens"])
+
+    def test_large_context_recommends_a_fresh_worker(self):
+        self.assertEqual(self._start()[0], 0)
+        self._tokens_with_context(200_000, 110_000, window=200_000)
+        _, result = self._call("finish", "--run", "run-1", "--task", "task-1", "--outcome", "accepted")
+        self.assertIn("fresh", result["context_advice"])
+
+    def advice_after(self, last_input, window=None):
+        self._tokens_with_context(110, 0, window=window)  # known starting context
+        self.assertEqual(self._start()[0], 0)
+        self._tokens_with_context(last_input + 10, last_input, window=window)
+        return self._call("finish", "--run", "run-1", "--task", "task-1", "--outcome", "accepted")[1]
+
+    def test_context_with_room_invites_a_natural_follow_on(self):
+        result = self.advice_after(20_000, window=258_400)
+        self.assertIn("room", result["context_advice"])
+
+    def test_middle_band_allows_only_a_small_dependent_follow_on(self):
+        result = self.advice_after(100_000, window=258_400)
+        self.assertIn("small follow-on", result["context_advice"])
+        self.assertNotIn("fresh", result["context_advice"])
+
+    def test_assignment_that_alone_outgrew_the_limit_is_flagged_for_splitting(self):
+        result = self.advice_after(usage.CONTEXT_RETIRE_TOKENS + 5_000)
+        self.assertEqual(usage.CONTEXT_RETIRE_TOKENS + 5_000, result["assignment_growth_tokens"])
+        self.assertIn("split", result["context_advice"])
+
+    def test_reused_worker_past_the_limit_is_not_blamed_on_this_assignment(self):
+        self._tokens_with_context(110, 0)
+        self.assertEqual(self._start()[0], 0)
+        self._tokens_with_context(usage.CONTEXT_RETIRE_TOKENS + 10, usage.CONTEXT_RETIRE_TOKENS)
+        self._call("finish", "--run", "run-1", "--task", "task-1", "--outcome", "accepted")
+        self.assertEqual(self._start(task="task-2")[0], 0)
+        self._tokens_with_context(usage.CONTEXT_RETIRE_TOKENS + 5_010, usage.CONTEXT_RETIRE_TOKENS + 5_000)
+        result = self._call("finish", "--run", "run-1", "--task", "task-2", "--outcome", "accepted")[1]
+        self.assertEqual(5_000, result["assignment_growth_tokens"])
+        self.assertIn("fresh", result["context_advice"])
+        self.assertNotIn("split", result["context_advice"])
+
+    def test_retirement_point_is_capped_without_a_window(self):
+        self.assertEqual(self._start()[0], 0)
+        self._tokens_with_context(200_000, usage.CONTEXT_RETIRE_TOKENS)
+        _, result = self._call("finish", "--run", "run-1", "--task", "task-1", "--outcome", "accepted")
+        self.assertIn("fresh", result["context_advice"])
+
+    def test_main_session_reports_context_without_worker_advice(self):
+        arguments = ["start", "--run", "run-1", "--task", "M001", "--project-tag", "project",
+                     "--role", "main", "--model", "model-a", "--effort", "medium",
+                     "--mode", "local", "--difficulty", "hard", "--thread-id", "thread-1",
+                     "--session", str(self.session), "--tariff", str(self.tariff)]
+        self.assertEqual(self._call(*arguments)[0], 0)
+        self._tokens_with_context(200_000, 150_000, window=258_400)
+        _, result = self._call("finish", "--run", "run-1", "--task", "M001", "--outcome", "accepted")
+        self.assertEqual(150_000, result["context_tokens"])
+        self.assertNotIn("context_advice", result)
+
+    def test_context_is_omitted_when_telemetry_lacks_it(self):
+        self.assertEqual(self._start()[0], 0)
+        self._tokens(200, 50, 70, 25)
+        _, result = self._call("finish", "--run", "run-1", "--task", "task-1", "--outcome", "accepted")
+        self.assertNotIn("context_tokens", result)
+
     def test_active_thread_reuse_is_rejected_then_finish_is_idempotent(self):
         self.assertEqual(self._start()[0], 0)
         code, error = self._start(task="task-2")

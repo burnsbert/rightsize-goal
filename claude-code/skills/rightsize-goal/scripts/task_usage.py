@@ -39,6 +39,12 @@ ASSUMPTIONS = (
 # A single session can legitimately contain thousands of requests. Beyond this the
 # baseline is refused rather than silently truncated into a wrong subtraction.
 MAX_BASELINE_KEYS = 50_000
+# Past this many tokens of carried context, a fresh worker with a short handoff is cheaper
+# to run than one that re-reads everything it has seen on every request, and less exposed
+# to stale instructions from earlier assignments.
+CONTEXT_RETIRE_TOKENS = 200_000
+# Below this, a worker has room to take a natural follow-on without approaching retirement.
+CONTEXT_ROOM_TOKENS = 120_000
 
 
 class UsageError(ValueError):
@@ -269,6 +275,8 @@ def read_usage(path: Path, *, skip_sidechain: bool, exclude: frozenset[str] = fr
     by_effort: dict[str, dict[str, int]] = defaultdict(_zero_tokens)
     seen: set[str] = set()
     counted = 0
+    context = None
+    first_context = None
     for record in _iter_records(path):
         if skip_sidechain and record.get("isSidechain") is True:
             continue
@@ -289,11 +297,17 @@ def read_usage(path: Path, *, skip_sidechain: bool, exclude: frozenset[str] = fr
             by_model[model][name] += value
             by_effort[effort][name] += value
         counted += 1
+        # Every request carries the worker's whole context, so the latest one measures it.
+        context = tokens["input"] + tokens["cache_read"] + tokens["cache_write_5m"] + tokens["cache_write_1h"]
+        if first_context is None:
+            first_context = context
     return {
         "status": "available",
         "models": {key: value for key, value in by_model.items() if any(value.values())},
         "efforts": {key: value for key, value in by_effort.items() if any(value.values())},
         "requests": counted,
+        "context_tokens": context,
+        "context_at_start": first_context,
         "keys": sorted(seen | set(exclude)),
     }
 
@@ -544,6 +558,9 @@ def finish(args: argparse.Namespace) -> dict[str, Any]:
             totals["requests"] = int(usage.get("requests", 0))
         else:
             cost_status, cost_usd, cost_reason, totals = "unavailable", None, usage_reason, None
+        context_tokens = usage.get("context_tokens") if usage["status"] == "available" else None
+        growth = (context_tokens - usage["context_at_start"]
+                  if context_tokens is not None and usage.get("context_at_start") is not None else None)
 
         db.execute(
             """UPDATE tasks SET finished_at=?, finished_at_display=?, status='finished', outcome=?,
@@ -566,7 +583,8 @@ def finish(args: argparse.Namespace) -> dict[str, Any]:
             "tokens": totals, "usage_status": usage["status"], "usage_reason": usage_reason,
             "estimated_cost_usd": cost_usd, "cost_status": cost_status,
             "cost_reason": cost_reason, "tariff_version": tariff_version,
-            "actual_models": sorted(models), "actual_efforts": sorted(efforts)})
+            "actual_models": sorted(models), "actual_efforts": sorted(efforts),
+            "context_tokens": context_tokens})
 
     result = {
         "command": "finish", "run": args.run, "task": args.task, "status": "finished",
@@ -579,7 +597,30 @@ def finish(args: argparse.Namespace) -> dict[str, Any]:
         result["usage_reason"] = usage_reason
     if cost_reason:
         result["cost_reason"] = cost_reason
+    if context_tokens is not None:
+        result["context_tokens"] = context_tokens
+        if growth is not None:
+            result["assignment_growth_tokens"] = growth
+        if not skip_sidechain:  # worker advice; the main session is never "reused"
+            result["context_advice"] = _context_advice(context_tokens, growth)
     return result
+
+
+def _context_advice(tokens: int, growth: int | None = None) -> str:
+    if tokens >= CONTEXT_RETIRE_TOKENS:
+        advice = (f"worker context is {tokens:,} tokens, past the {CONTEXT_RETIRE_TOKENS:,} retirement point: "
+                  "start a fresh worker with a short handoff for the next assignment, and shut this one down "
+                  "unless it has a small follow-on that only it can do")
+    elif tokens >= CONTEXT_ROOM_TOKENS:
+        advice = (f"worker context is {tokens:,} tokens: reuse it only for a small follow-on that depends on what "
+                  "it already knows; give anything larger to a new worker")
+    else:
+        advice = (f"worker context is {tokens:,} tokens: room to reuse it for a natural follow-on, such as fixing "
+                  "or extending its own work or the next step in the same area")
+    if growth is not None and growth >= CONTEXT_RETIRE_TOKENS:
+        advice += (f"; this assignment alone grew its context by {growth:,} tokens, so split work of this size "
+                   "into smaller assignments with their own checkpoints next time")
+    return advice
 
 
 def report(args: argparse.Namespace) -> dict[str, Any]:

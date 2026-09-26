@@ -50,7 +50,12 @@ installer destinations. They do not configure Codex to discover an arbitrary
 location. If using a custom Codex home, launch Codex with the same `CODEX_HOME`.
 
 Normal installation copies resources and leaves `config.toml` byte-for-byte
-unchanged. It does not change your main model, permissions, credentials, or limits.
+unchanged. The copied worker roles set `sandbox_mode = "danger-full-access"`,
+`approval_policy = "never"`, and `web_search = "live"`. Installation does not
+configure the parent session's permissions. Before delegating, configure the
+target project's coordinator for full access as described in the
+[run instructions](../README.md#run). Active parent permission overrides and
+managed restrictions can take precedence over worker defaults.
 Run only one installer at a time and do not edit the same files while it runs.
 
 ## Alternative entry points

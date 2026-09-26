@@ -7,7 +7,8 @@ are not guaranteed. For a one-step request, the main thread completes it directl
 without dispatching agents or creating persistent goal state.
 
 This package ships one skill, five custom agents, two standard-library Python
-helpers, and installers. It uses your existing Codex account and permissions.
+helpers, and installers. It uses your existing Codex account, with full-access
+permission defaults for all five workers.
 
 ## Requirements
 
@@ -120,6 +121,32 @@ Known moderate work goes directly to Sol/medium rather than using Luna as a chea
 The most complex work goes directly to Sol/high when Astra escalation is a credible
 risk. Astra has one medium-effort principal engineer role so the escalation receives
 enough reasoning budget without an Astra/low retry.
+
+Every role sets the following defaults for filesystem access, network access
+from commands, and live web research:
+
+```toml
+sandbox_mode = "danger-full-access"
+approval_policy = "never"
+web_search = "live"
+```
+
+The coordinator must also run with full access. This repository's
+[project configuration](../.codex/config.toml) sets these defaults and registers
+the five distributed roles using relative paths. In another trusted project,
+merge the three settings above into its `.codex/config.toml` before starting
+Codex. For a one-off CLI session, use
+`codex --sandbox danger-full-access --ask-for-approval never --search`.
+In the app or IDE, select full access for the parent session before delegating.
+
+The parent's active permission overrides can take precedence over role defaults;
+agent files cannot override managed restrictions. See the official
+[subagent permission documentation](https://learn.chatgpt.com/docs/agent-configuration/subagents)
+and [permission settings](https://learn.chatgpt.com/docs/agent-approvals-security).
+Full access includes files outside the repository. Assigned scope still applies:
+research is read-only unless artifact ownership is assigned, and commits,
+publishing, and external messages require explicit authorization. Those boundaries
+are agent instructions rather than filesystem restrictions.
 
 Each goal has a unique `.rightsize-goal/<goal-id>.jsonl` call/result log in the target project. Task usage and routing history remain in that project's `.rightsize-goal/usage.sqlite3`. The cost figures are standard-rate API-equivalent estimates from a versioned tariff; they are useful for routing comparisons but are not an authoritative subscription bill.
 

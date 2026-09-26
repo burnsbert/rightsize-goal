@@ -5,6 +5,12 @@ any actual limits. Open Codex in the project you want it to work on. Select
 `gpt-6-sol` at medium reasoning when available. Other root models are disclosed
 as a mismatch; the skill cannot switch the root model for you.
 
+Select full access for the coordinator before delegating. The five worker roles
+default to `sandbox_mode = "danger-full-access"`, `approval_policy = "never"`,
+and `web_search = "live"`. Configure the target project's parent session using
+the [permission setup](../README.md#run); active parent overrides and managed
+restrictions can take precedence over the role defaults.
+
 When invoked for a short self-contained request, the skill handles it in the main
 thread and skips agents, accounting, and persistent goal setup. A current-time
 lookup or trivial localized edit is an example. Explicit `/goal`, time or
@@ -62,6 +68,14 @@ as evidence arrives. A task has a coherent outcome and checkpoint; many simple
 repeated steps may share one task, while uncertain implementation and live
 evaluation may need separate assignments.
 
+The coordinator retires workers it no longer expects to use. It closes them
+when the runtime provides a close operation and confirms closure. Otherwise,
+finished workers remain idle and are recorded as retired from future assignments,
+with their actual runtime status retained. Interrupting a worker does not prove
+its thread closed or a concurrency slot was released. If the runtime cannot
+free capacity for another assignment, the coordinator preserves a handoff and
+reports the capacity limit.
+
 Each `.rightsize-goal/<goal-id>.jsonl` log contains only agent calls and results, including agent identity, measured tokens, estimated cost, and reasons for retries. The matching `.state.json` holds current objective and evidence; `.gate.json` retains time bounds and evaluated iteration count. The coordinator adds `.rightsize-goal/` to the project's local Git exclusion when applicable. Do not commit logs containing private work.
 
 One substantive iteration includes a hypothesis/improvement, meaningful action,
@@ -103,7 +117,9 @@ state. The gate helper has no command to edit existing bounds automatically.
   automatic continuation. A saved goal log alone does not schedule future execution.
 - More agents can increase token consumption. The policy seeks lower total cost,
   including rework; it does not establish guaranteed savings.
-- Permissions remain those of the host and user request. Persistent goals do not
-  authorize unrelated publishing, messages, purchases, or destructive operations.
+- Full access permits filesystem access outside the repository and network access
+  from commands. Assigned scope and user authorization still apply; persistent
+  goals do not authorize unrelated publishing, messages, purchases, or destructive
+  operations.
 - Research-only tasks may still create the authorized workflow's local logs and
   usage metadata; they do not authorize product-code changes.

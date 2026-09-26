@@ -1,5 +1,24 @@
 # Claude Code release checks
 
+## 1.1.2 verification — September 26, 2026
+
+1.1.2 includes the unreleased 1.1.1 changes. Both add worker-lifecycle rules: context reporting
+and three-band reuse advice from `task_usage.py finish`, a flag for assignments that alone
+outgrew the 200,000-token retirement point, shutdown of unneeded teammates, `SendMessage` on
+every role so a teammate can accept a shutdown, and online research tools on every role. The
+suite (112 tests) and both strict manifest validations pass; the new advice and the growth flag
+each have tests that fail when the behavior is removed.
+
+Evidence from real runs: a 1.1.0-era run (omniwatch) went end to end, with workers, the
+validator, and a DONE verdict, but reused one teammate for five tasks and let another reach
+924,000 tokens of context. A 1.1.1 run (everwatch) gave every new area a fresh teammate with no
+reuse. One of its single assignments still reached 628,000 tokens, and its one shutdown request
+failed because workers had no way to reply. Both runs read the skill and helpers from a
+local-folder plugin install's working tree, so they picked up repository edits mid-run.
+
+Not yet observed live: a teammate accepting a shutdown request (headless test sessions dispatch
+plain background agents rather than teammates), and the coordinator applying the reuse bands.
+
 ## 1.1.0 verification — September 25, 2026
 
 1.1.0 adds self-driving persistence: a plugin Stop hook (`hooks/hooks.json`, running

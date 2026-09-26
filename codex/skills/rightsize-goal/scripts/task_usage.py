@@ -20,6 +20,10 @@ from typing import Any, Sequence, TextIO
 DIFFICULTIES = ("basic", "routine", "moderate", "hard", "expert")
 OUTCOMES = ("accepted", "rework", "unresolved", "cancelled", "failed")
 TOKEN_FIELDS = ("input_tokens", "cached_input_tokens", "output_tokens", "reasoning_output_tokens", "cache_write_tokens")
+# Past this much carried context (or half the model's window, if lower), a fresh worker with a
+# short handoff is cheaper than one that re-reads everything, and less exposed to stale
+# instructions and lossy compaction.
+CONTEXT_RETIRE_TOKENS = 128_000
 ASSUMPTIONS = "standard-rate API-equivalent baseline; excludes long-context, fast-mode, tool, and other modifiers; not an actual invoice"
 
 
@@ -201,6 +205,8 @@ def snapshot(path: Path) -> dict[str, Any]:
     effort = "unknown"
     events = 0
     resets = 0
+    context: int | None = None
+    window: int | None = None
     for kind, payload in _iter_relevant(path):
         if kind == "turn_context":
             # A new turn without attribution must not inherit the preceding turn's labels.
@@ -231,9 +237,17 @@ def snapshot(path: Path) -> dict[str, Any]:
                 effort_totals[effort][name] += value
             previous = current
             events += 1
+            info = payload.get("info") if isinstance(payload.get("info"), dict) else {}
+            last = info.get("last_token_usage")
+            last_input = last.get("input_tokens") if isinstance(last, dict) else None
+            # The latest turn's input carries the worker's whole context, cached or not.
+            context = last_input if isinstance(last_input, int) and not isinstance(last_input, bool) and last_input >= 0 else None
+            size = info.get("model_context_window")
+            window = size if isinstance(size, int) and not isinstance(size, bool) and size > 0 else window
     if events == 0:
         return {"status": "unavailable", "reason": "no token_count telemetry", "models": {}, "efforts": {}, "resets": 0}
-    return {"status": "available", "models": dict(totals), "efforts": dict(effort_totals), "resets": resets}
+    return {"status": "available", "models": dict(totals), "efforts": dict(effort_totals), "resets": resets,
+            "context_tokens": context, "context_window": window}
 
 
 def _subtract_dimension(after: dict[str, Any], before: dict[str, Any], dimension: str) -> dict[str, dict[str, int]] | None:
@@ -384,13 +398,42 @@ def finish(args: argparse.Namespace) -> dict[str, Any]:
             "tokens": totals, "usage_status": usage_status, "usage_reason": usage_reason,
             "estimated_cost_usd": cost_usd, "cost_status": cost_status,
             "cost_reason": cost_reason, "tariff_version": tariff.get("version") if tariff else None,
-            "actual_models": sorted(models), "actual_efforts": sorted(efforts)})
+            "actual_models": sorted(models), "actual_efforts": sorted(efforts),
+            "context_tokens": after.get("context_tokens") if after.get("status") == "available" else None})
     result = {"command": "finish", "run": args.run, "task": args.task, "status": "finished", "idempotent": False, "outcome": args.outcome, "usage_status": usage_status, "tokens": totals, "actual_models": sorted(models), "actual_efforts": sorted(efforts), "cost_status": cost_status, "cost_usd": cost_usd, "tariff_version": tariff.get("version") if tariff else None, "cost_assumptions": ASSUMPTIONS, "recorded_at": _display_now()}
     if usage_reason:
         result["usage_reason"] = usage_reason
     if cost_reason:
         result["cost_reason"] = cost_reason
+    if after.get("status") == "available" and after.get("context_tokens") is not None:
+        result["context_tokens"] = after["context_tokens"]
+        result["context_window"] = after.get("context_window")
+        start_context = 0 if before.get("basis") == "explicit_new_thread_zero" else before.get("context_tokens")
+        growth = after["context_tokens"] - start_context if isinstance(start_context, int) else None
+        if growth is not None:
+            result["assignment_growth_tokens"] = growth
+        if row["role"] != "main":  # worker advice; the main session is never "reused"
+            result["context_advice"] = _context_advice(after["context_tokens"], after.get("context_window"), growth)
     return result
+
+
+def _context_advice(tokens: int, window: int | None, growth: int | None = None) -> str:
+    limit = min(CONTEXT_RETIRE_TOKENS, window // 2) if window else CONTEXT_RETIRE_TOKENS
+    room = limit * 3 // 5
+    if tokens >= limit:
+        advice = (f"worker context is {tokens:,} tokens, past the {limit:,} retirement point: start a fresh "
+                  "worker with a short handoff for the next assignment, and close this one unless it has a "
+                  "small follow-on that only it can do")
+    elif tokens >= room:
+        advice = (f"worker context is {tokens:,} tokens: reuse it only for a small follow-on that depends on what "
+                  "it already knows; give anything larger to a new worker")
+    else:
+        advice = (f"worker context is {tokens:,} tokens: room to reuse it for a natural follow-on, such as fixing "
+                  "or extending its own work or the next step in the same area")
+    if growth is not None and growth >= limit:
+        advice += (f"; this assignment alone grew its context by {growth:,} tokens, so split work of this size "
+                   "into smaller assignments with their own checkpoints next time")
+    return advice
 
 
 def report(args: argparse.Namespace) -> dict[str, Any]:

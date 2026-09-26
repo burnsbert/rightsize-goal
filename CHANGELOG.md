@@ -1,5 +1,51 @@
 # Changelog
 
+## 1.1.2 — 2026-09-26
+
+### Claude Code
+
+- Teammates can now accept a shutdown request: every role has `SendMessage` and is told to
+  approve a shutdown when idle. Before this, a shutdown request could not be accepted, so
+  teammates accumulated.
+- A happier medium on reuse: reuse a teammate when its context has room and the next task is a
+  natural follow-on. `finish` advice now has three bands: room below 120,000 tokens, only small
+  dependent follow-ons up to 200,000, and retire after that.
+- `finish` reports `assignment_growth_tokens` and flags an assignment that alone grew past
+  200,000 tokens as work to split next time; the skill keeps single assignments well within that.
+- Every role, including the junior and the validator, can research online with `WebFetch` and
+  `WebSearch`.
+
+### Codex
+
+- The same reuse bands and oversized-assignment flag, measured against 128,000 tokens or half
+  the context window, whichever is lower.
+- Every role sets `sandbox_mode = "danger-full-access"`, `approval_policy = "never"`,
+  and `web_search = "live"` for full filesystem and command network access plus live
+  web research. The repository's Codex config registers the five packaged roles and
+  applies the same coordinator defaults. Active parent permission overrides still apply.
+- Worker cleanup checks runtime capabilities before closing agents. When closure is
+  unavailable, finished workers are retired from future assignments while their actual
+  runtime status is retained. Interrupting or retiring a worker is not treated as
+  confirmation that a concurrency slot was released.
+
+## 1.1.1 — 2026-09-25
+
+### Claude Code
+
+- Reuse a teammate only for a direct follow-up on its own recent work; give work in a
+  different area to a fresh teammate with a short handoff. `task_usage.py finish` now reports
+  the worker's context size and advises retiring it past 200,000 tokens, since every request
+  re-reads everything the worker has seen.
+- Shut down teammates that are unlikely to get another assignment with a `SendMessage`
+  shutdown request, and keep live teammates few, typically three to five.
+
+### Codex
+
+- Reuse an agent only for a direct follow-up on its own recent work. `task_usage.py finish`
+  now reports the worker's context size and window, and advises retiring it past 128,000
+  tokens or half its context window, whichever is lower.
+- Close agents that are unlikely to get another assignment with `close_agent`.
+
 ## 1.1.0 — 2026-09-25
 
 ### Claude Code

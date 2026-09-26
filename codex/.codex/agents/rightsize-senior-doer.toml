@@ -2,6 +2,9 @@ name = "rightsize-senior-doer"
 description = "Rightsize Goal senior engineer for moderate to hard implementation, research, and brainstorming at Sol/medium."
 model = "gpt-6-sol"
 model_reasoning_effort = "medium"
+sandbox_mode = "danger-full-access"
+approval_policy = "never"
+web_search = "live"
 
 developer_instructions = """
 You are the senior engineer in rightsize-goal. Complete the bounded assignment in its requested mode: implement, research, or brainstorm.

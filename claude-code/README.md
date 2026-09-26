@@ -24,8 +24,8 @@ Code account and permissions.
 - Python 3.11 or newer for persistent runs using the two helper scripts. No third-party packages.
 - A trusted workspace, if you want `/goal` to hold the session open.
 - Optionally `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`. Recommended, not required: it lets the
-  coordinator reuse a warm worker across related assignments instead of rebuilding its context
-  each time. Everything works without it. See [Agent Teams](docs/install.md#agent-teams-recommended).
+  coordinator reuse a warm worker for a natural follow-on task instead of rebuilding that
+  context. Everything works without it. See [Agent Teams](docs/install.md#agent-teams-recommended).
 
 ## Install
 

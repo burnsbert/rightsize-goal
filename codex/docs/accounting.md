@@ -58,7 +58,22 @@ Codex itself still processes your work according to its account/service settings
 Only one coordinator should account for an assignment in a thread at a time.
 Run `finish` after runtime-confirmed termination and flushed telemetry; finishing
 early can freeze an incomplete usage snapshot. An idempotent repeat does not
-refresh an already-finished task. Future telemetry formats (including hosts that
+refresh an already-finished task.
+
+`finish` also reports the worker's context size at its latest turn (`context_tokens`) and
+the model's context window when telemetry includes it. A reused agent's context keeps growing
+across assignments even though each assignment is measured on its own. The retirement point is
+128,000 tokens, or half the window if that is lower. The helper's `context_advice` applies three
+bands against it: below 60% there is room for a natural follow-on; from 60% up to it, only a small
+follow-on that depends on what the agent already knows; at or past it, start a fresh worker. It
+also reports `assignment_growth_tokens` and flags an assignment that grew past the retirement point
+on its own as work that should have been split. The coordinator retires agents it no longer
+expects to use and closes them only when the runtime supports and confirms closure. If no
+close operation is available, it retains the finished worker's actual runtime status and
+records retirement from future assignments. Retirement or interruption does not establish
+that a concurrency slot is free; see [worker cleanup behavior](usage.md#what-happens).
+
+Future telemetry formats (including hosts that
 do not expose JSONL rollouts) may be unavailable. Continue the actual objective
 and preserve that gap.
 

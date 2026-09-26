@@ -101,9 +101,12 @@ test addition, cost **$0.0434 across 93,956 tokens and 9 requests**. A teammate 
 it loads its own project instructions and orients itself before it reaches your task. Its floor is
 roughly four to five times a subagent's.
 
-The lesson is not "avoid teammates" — reuse across several related assignments repays that startup
-cost quickly. The lesson is that a teammate is the wrong shape for one tiny errand, and that
-dispatch overhead, not model rate, dominates the price of small work. Bundle accordingly.
+The lesson is not "avoid teammates": reusing a teammate for natural follow-ons while its context
+has room repays that startup cost quickly. Reusing it for unrelated work does not, because every
+request re-reads its whole context, so the coordinator gives work in an unrelated area to a fresh
+teammate and retires teammates whose context passes 200,000 tokens. The lesson is that a teammate
+is the wrong shape for one tiny errand, and that dispatch overhead, not model rate, dominates the
+price of small work. Bundle accordingly.
 
 These are single runs on one machine, not a benchmark. Let the ledger replace them with your own
 project's evidence.
@@ -177,11 +180,13 @@ The role files constrain behavior structurally, not only by instruction:
   escalation gate cannot be bypassed by a worker escalating itself. A packaged test
   asserts this for every role file.
 - Every worker role gets `Read, Glob, Grep, Bash, Write, Edit, MultiEdit`.
-  `rightsize-midlevel-doer` and above also get `WebFetch` and `WebSearch`, because research
-  synthesis is explicitly in those roles' remit.
-- `rightsize-validator` gets only `Read, Glob, Grep, Bash`: enough to run checks and read the
-  work, with no file-editing tools. A packaged test asserts it stays that way.
-- No role is granted artifact publishing, scheduling, messaging, or goal-state tools. The
+- Every role, including the validator, gets `WebFetch` and `WebSearch` so it can research
+  online, and `SendMessage` so a teammate can accept the coordinator's shutdown request.
+  `SendMessage` cannot spawn agents, so the escalation gate is unaffected. A packaged test
+  asserts all of this.
+- `rightsize-validator` gets no file-editing tools: enough to run checks, read the work, and
+  look things up. A packaged test asserts it stays that way.
+- No role is granted artifact publishing, scheduling, or goal-state tools. The
   coordinator alone owns the session goal, the goal log, and the gate state.
 - Every role is instructed not to commit, push, publish, or send external messages unless
   the assignment explicitly authorizes it.

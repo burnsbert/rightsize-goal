@@ -85,6 +85,25 @@ class PackageTests(unittest.TestCase):
                 self.assertIn(agent["model"], tariff["models"])
                 self.assertIn(agent["name"], instructions)
                 self.assertIn(agent["model_reasoning_effort"], {"low", "medium", "high", "xhigh"})
+                # Web search and shell network/filesystem permissions are separate controls.
+                self.assertEqual("danger-full-access", agent.get("sandbox_mode"))
+                self.assertEqual("never", agent.get("approval_policy"))
+                self.assertEqual("live", agent.get("web_search"))
+
+    def test_project_config_resolves_distributed_roles_with_matching_permissions(self):
+        config_path = REPO / ".codex/config.toml"
+        config = tomllib.loads(config_path.read_text(encoding="utf-8"))
+        roles = {path.stem: path for path in (PACKAGE / ".codex/agents").glob("*.toml")}
+        self.assertEqual(set(roles), set(config["agents"]))
+        for name, source in roles.items():
+            with self.subTest(role=name):
+                registration = config["agents"][name]
+                target = Path(registration["config_file"])
+                self.assertFalse(target.is_absolute())
+                self.assertEqual(source.resolve(), (config_path.parent / target).resolve())
+                agent = tomllib.loads(source.read_text(encoding="utf-8"))
+                for key in ("sandbox_mode", "approval_policy", "web_search"):
+                    self.assertEqual(agent[key], config[key])
 
     def test_documentation_relative_links_exist(self):
         files = list(REPO.glob("*.md")) + list(PACKAGE.rglob("*.md"))

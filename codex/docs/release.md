@@ -1,6 +1,20 @@
 # Codex release checks
 
-## Review status: September 9, 2026
+## Current checks: September 25, 2026
+
+All 60 Codex tests passed after the permission configuration changes. After the
+worker cleanup instruction changes, skill validation and all seven package tests
+passed. The package checks cover matching permission settings and relative role
+paths in the repository config, as well as consistency between the two skill copies.
+
+The five worker roles and repository coordinator config now default to full access,
+no routine command approval prompts, and live web search. Cleanup uses a supported
+close operation when available and otherwise records retirement separately from
+actual runtime status. No live worker was spawned to verify effective permissions,
+online retrieval, or cleanup behavior during this review. Those checks remain in
+the release checklist below. Claude Code tests were not rerun in this review.
+
+## Earlier review and verification history
 
 The source installer, helper scripts, agent TOMLs, skill instructions, and public
 documentation were reviewed. Verified defects fixed during that review:
@@ -14,7 +28,7 @@ documentation were reviewed. Verified defects fixed during that review:
 - Missing model/effort labels no longer inherit attribution from an earlier turn.
 - Invalid state encodings and boolean gate versions are rejected.
 - Python interpreter and local-time instructions work across supported OS families.
-- Routing calibration sends known moderate work to Terra sooner, uses the Sol/high
+- Routing calibration sends known moderate work directly to Sol/medium, uses the Sol/high
   staff engineer as the strongest first pass for the most complex work, and uses
   one Astra/medium principal engineer escalation without a low-effort retry.
 - Upgrades retire the former lower-senior and generic Astra role filenames safely;
@@ -34,8 +48,6 @@ python codex/scripts/check_runtime.py
 This optional probe needs Codex CLI on PATH. It installs into a temporary directory,
 starts a temporary stdio app server with a separate Codex home, requests only skill
 discovery, then stops that process and removes its temporary directory.
-The bundled tariff values were checked against the four linked official model
-pages on September 7; the original rate version and expiry remain unchanged.
 
 The local suite count and result should be refreshed immediately before release.
 On September 24, all 50 Codex tests and 65 Claude Code tests passed locally.
@@ -61,6 +73,10 @@ error-free behavior.
   after upgrade.
 - Run a small goal in a disposable project. Confirm suitable delegation, verified
   acceptance, a saved log/gate, and honest usage results (available or explained gaps).
+- In that disposable project, confirm a worker can fetch an online source and write
+  an assigned file with the intended effective permissions. Check parent permission
+  overrides. Verify cleanup with the host's available tools, including retirement
+  without a close operation and accurate reporting when concurrency capacity is full.
 - Test a requested stop and a resumed run using the same gate. On hosts exposing
   native goals, check native completion as well as local gate completion.
 - Check model availability on the intended account; never infer it from API prices.

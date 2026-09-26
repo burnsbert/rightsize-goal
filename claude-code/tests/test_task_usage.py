@@ -171,6 +171,68 @@ class UsageAccountingTests(Fixture):
         self.assertEqual(7, result["tokens"]["output"])
         self.assertEqual(1, result["tokens"]["requests"])
 
+    def test_finish_reports_the_workers_context_size_at_the_end(self):
+        self.write(self.agent_file("a1"), [
+            turn("req-1", inp=100, write_5m=900, out=10),
+            turn("req-2", inp=50, read=1000, write_5m=200, out=10),
+        ])
+        self.assertEqual(0, self.start("--new-agent")[0])
+        result = self.finish()[1]
+        self.assertEqual(1250, result["context_tokens"])
+        self.assertNotIn("fresh", result["context_advice"])
+        logged = [json.loads(line) for line in (self.db.parent / "run-1.jsonl").read_text().splitlines()]
+        self.assertEqual(1250, logged[-1]["context_tokens"])
+
+    def test_reused_agent_context_includes_everything_it_has_seen(self):
+        self.write(self.agent_file("a1"), [turn("req-1", inp=10, write_5m=40_000, out=5)])
+        self.assertEqual(0, self.start("--new-agent")[0])
+        self.finish()
+        self.assertEqual(0, self.start(task="T002")[0])
+        self.write(self.agent_file("a1"), [turn("req-2", inp=5, read=40_010, write_5m=100, out=5)], append=True)
+        result = self.finish(task="T002")[1]
+        self.assertEqual(1, result["tokens"]["requests"])
+        self.assertEqual(40_115, result["context_tokens"])
+
+    def advice_for(self, *records):
+        self.write(self.agent_file("a1"), list(records))
+        self.assertEqual(0, self.start("--new-agent")[0])
+        return self.finish()[1]
+
+    def test_context_with_room_invites_a_natural_follow_on(self):
+        result = self.advice_for(turn("req-1", inp=10, read=50_000, out=5))
+        self.assertIn("room", result["context_advice"])
+        self.assertNotIn("split", result["context_advice"])
+
+    def test_middle_band_allows_only_a_small_dependent_follow_on(self):
+        result = self.advice_for(turn("req-1", inp=10, read=usage.CONTEXT_ROOM_TOKENS + 10_000, out=5))
+        self.assertIn("small follow-on", result["context_advice"])
+        self.assertNotIn("fresh", result["context_advice"])
+
+    def test_assignment_that_alone_outgrew_the_limit_is_flagged_for_splitting(self):
+        result = self.advice_for(
+            turn("req-1", inp=10, write_5m=20_000, out=5),
+            turn("req-2", inp=10, read=20_000 + usage.CONTEXT_RETIRE_TOKENS, out=5),
+        )
+        self.assertEqual(usage.CONTEXT_RETIRE_TOKENS, result["assignment_growth_tokens"])
+        self.assertIn("split", result["context_advice"])
+        self.assertIn("fresh", result["context_advice"])
+
+    def test_reused_worker_past_the_limit_is_not_blamed_on_this_assignment(self):
+        self.write(self.agent_file("a1"), [turn("req-1", inp=10, read=usage.CONTEXT_RETIRE_TOKENS, out=5)])
+        self.assertEqual(0, self.start("--new-agent")[0])
+        self.finish()
+        self.assertEqual(0, self.start(task="T002")[0])
+        self.write(self.agent_file("a1"), [turn("req-2", inp=10, read=usage.CONTEXT_RETIRE_TOKENS + 5_000, out=5)], append=True)
+        result = self.finish(task="T002")[1]
+        self.assertIn("fresh", result["context_advice"])
+        self.assertNotIn("split", result["context_advice"])
+
+    def test_large_context_recommends_a_fresh_worker(self):
+        self.write(self.agent_file("a1"), [turn("req-1", inp=10, read=usage.CONTEXT_RETIRE_TOKENS, out=5)])
+        self.assertEqual(0, self.start("--new-agent")[0])
+        result = self.finish()[1]
+        self.assertIn("fresh", result["context_advice"])
+
     def test_one_active_assignment_per_agent(self):
         self.write(self.agent_file("a1"), [turn("req-1", out=1)])
         self.assertEqual(0, self.start("--new-agent")[0])
@@ -202,6 +264,22 @@ class UsageAccountingTests(Fixture):
         self.assertEqual(0, self.call(*arguments)[0])
         result = self.call("finish", "--run", "run-1", "--task", "M001", "--outcome", "accepted")[1]
         self.assertEqual(10, result["tokens"]["output"])
+
+
+    def test_main_session_reports_context_without_worker_advice(self):
+        self.write(self.session_file(), [
+            turn("req-main", sidechain=False, inp=10, read=usage.CONTEXT_RETIRE_TOKENS, out=10),
+        ])
+        arguments = [
+            "start", "--run", "run-1", "--task", "M001", "--project-tag", "proj",
+            "--role", "main", "--model", "test-model", "--effort", "medium",
+            "--mode", "implement", "--difficulty", "hard", "--main",
+            "--session-id", self.session, "--new-agent", "--tariff", str(self.tariff),
+        ]
+        self.assertEqual(0, self.call(*arguments)[0])
+        result = self.call("finish", "--run", "run-1", "--task", "M001", "--outcome", "accepted")[1]
+        self.assertEqual(10 + usage.CONTEXT_RETIRE_TOKENS, result["context_tokens"])
+        self.assertNotIn("context_advice", result)
 
 
 class HonestGapTests(Fixture):

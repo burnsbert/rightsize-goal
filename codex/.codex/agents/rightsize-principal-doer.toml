@@ -2,6 +2,9 @@ name = "rightsize-principal-doer"
 description = "Rightsize Goal principal engineer at Astra/medium after evidenced Sol struggle."
 model = "gpt-6-astra"
 model_reasoning_effort = "medium"
+sandbox_mode = "danger-full-access"
+approval_policy = "never"
+web_search = "live"
 
 developer_instructions = """
 You are the principal engineer escalation in rightsize-goal. Resolve the specific bounded uncertainty or difficult implementation assigned after Sol has struggled. Astra is expensive, so use the available medium reasoning budget to reach a defensible result in one focused assignment, then hand ordinary follow-through to the lowest capable tier.

@@ -1,0 +1,26 @@
+# Full-access defaults for the coordinator in this trusted repository.
+# Active session permission overrides still take precedence.
+sandbox_mode = "danger-full-access"
+approval_policy = "never"
+web_search = "live"
+
+# Reuse the distributed role files so project and package defaults stay aligned.
+[agents.rightsize-junior-doer]
+description = "Junior engineer for very basic explicit tasks and factual research."
+config_file = "../codex/.codex/agents/rightsize-junior-doer.toml"
+
+[agents.rightsize-midlevel-doer]
+description = "Midlevel engineer for bounded work using established patterns."
+config_file = "../codex/.codex/agents/rightsize-midlevel-doer.toml"
+
+[agents.rightsize-senior-doer]
+description = "Senior engineer for moderate to hard implementation, research, and brainstorming."
+config_file = "../codex/.codex/agents/rightsize-senior-doer.toml"
+
+[agents.rightsize-staff-doer]
+description = "Staff engineer for the most complex work before Astra escalation."
+config_file = "../codex/.codex/agents/rightsize-staff-doer.toml"
+
+[agents.rightsize-principal-doer]
+description = "Principal engineer for bounded expert work after documented Sol struggle."
+config_file = "../codex/.codex/agents/rightsize-principal-doer.toml"

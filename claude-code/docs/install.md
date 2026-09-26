@@ -126,8 +126,13 @@ says what it is — experimental, and subject to change.
 
 **With Agent Teams on**, a worker dispatched with a name becomes a *teammate*: it runs as its
 own addressable session, `ListAgents` lists it, and the coordinator can send it follow-up
-assignments with `SendMessage` while its context is still warm. That reuse is the point. Re-explaining
-a task to a fresh worker costs real tokens, and reuse avoids paying it twice.
+assignments with `SendMessage` while its context is still warm. That reuse is the point when
+the next task is a natural follow-on, such as fixing or extending what the teammate just built or
+the next step in the same area: re-explaining that work to a fresh worker would cost real tokens.
+Work in an unrelated area goes to a fresh teammate instead, because a teammate re-reads everything
+it has seen on every request. The coordinator reuses a teammate freely below 120,000 tokens of
+context, only for small dependent follow-ons up to 200,000, and retires it after that. It shuts
+down teammates it no longer expects to use; every role can accept a shutdown request.
 
 **With Agent Teams off**, the coordinator omits the name and dispatches an ordinary in-process
 subagent. Everything still works — routing, the escalation gate, the completion gate, and usage

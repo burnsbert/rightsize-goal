@@ -98,6 +98,10 @@ class PackageTests(unittest.TestCase):
                 self.assertNotIn("Agent", granted)
                 self.assertNotIn("Task", granted)
                 self.assertIn("Read", granted)
+                # A teammate can only accept a shutdown request by replying through SendMessage.
+                self.assertIn("SendMessage", granted)
+                # Every role can research online.
+                self.assertTrue({"WebFetch", "WebSearch"} <= granted)
 
     def test_every_tariff_rate_category_is_priced_for_every_model(self):
         tariff = json.loads((SKILL / "references/tariff.json").read_text(encoding="utf-8"))
