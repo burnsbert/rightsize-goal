@@ -62,13 +62,14 @@ refresh an already-finished task.
 
 `finish` also reports the worker's context size at its latest turn (`context_tokens`) and
 the model's context window when telemetry includes it. A reused agent's context keeps growing
-across assignments even though each assignment is measured on its own. The retirement point is
-128,000 tokens, or half the window if that is lower. The helper's `context_advice` applies three
-bands against it: below 60% there is room for a natural follow-on; from 60% up to it, only a small
-follow-on that depends on what the agent already knows; at or past it, start a fresh worker. It
-also reports `assignment_growth_tokens` and flags an assignment that grew past the retirement point
-on its own as work that should have been split. The coordinator retires agents it no longer
-expects to use and closes them only when the runtime supports and confirms closure. If no
+across assignments even though each assignment is measured on its own. Alongside it, `finish`
+reports `context_free_pct`, `eligible` (at least 30% of the window free and not compacted),
+`compacted` (Codex wrote a `compacted` record during the assignment), `assignment_growth_tokens`, and `oversized`
+(this assignment alone used 30% or more of the window), and writes them to the goal log.
+`task_usage.py workers --run <goal-id>` lists every worker's status, idle minutes, and context
+facts from its last log line, and marks it `gc_due` once it has been idle 15 minutes, falls under
+30% free, or is compacted; `task_usage.py stop` records a confirmed closure. The coordinator
+retires agents it no longer expects to use and closes them only when the runtime supports and confirms closure. If no
 close operation is available, it retains the finished worker's actual runtime status and
 records retirement from future assignments. Retirement or interruption does not establish
 that a concurrency slot is free; see [worker cleanup behavior](usage.md#what-happens).

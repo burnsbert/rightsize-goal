@@ -34,7 +34,9 @@ the acceptance checks itself.
 
 It runs on Opus because a wrong DONE is the expensive mistake. It ends the goal while work
 remains. The validator only runs when the coordinator claims completion, so the premium is
-paid rarely.
+paid rarely. It judges the goal as a QA engineer or product owner would, not as a hunt for any
+conceivable flaw: done is not the same as perfect. Follow-up rounds check the earlier reasons and
+the effects of their fixes, and do not fail the goal for issues an earlier round already saw.
 
 ## Two levers, not one
 
@@ -104,7 +106,8 @@ roughly four to five times a subagent's.
 The lesson is not "avoid teammates": reusing a teammate for natural follow-ons while its context
 has room repays that startup cost quickly. Reusing it for unrelated work does not, because every
 request re-reads its whole context, so the coordinator gives work in an unrelated area to a fresh
-teammate and retires teammates whose context passes 200,000 tokens. The lesson is that a teammate
+teammate, and stops teammates once they are idle 15 minutes, under 30% of their window free, or
+compacted. The lesson is that a teammate
 is the wrong shape for one tiny errand, and that dispatch overhead, not model rate, dominates the
 price of small work. Bundle accordingly.
 
@@ -181,9 +184,8 @@ The role files constrain behavior structurally, not only by instruction:
   asserts this for every role file.
 - Every worker role gets `Read, Glob, Grep, Bash, Write, Edit, MultiEdit`.
 - Every role, including the validator, gets `WebFetch` and `WebSearch` so it can research
-  online, and `SendMessage` so a teammate can accept the coordinator's shutdown request.
-  `SendMessage` cannot spawn agents, so the escalation gate is unaffected. A packaged test
-  asserts all of this.
+  online. No role gets `SendMessage`: the coordinator stops workers with `TaskStop`, and workers
+  never message each other or hand work around the coordinator. A packaged test asserts both.
 - `rightsize-validator` gets no file-editing tools: enough to run checks, read the work, and
   look things up. A packaged test asserts it stays that way.
 - No role is granted artifact publishing, scheduling, or goal-state tools. The

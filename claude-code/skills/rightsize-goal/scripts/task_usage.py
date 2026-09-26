@@ -39,12 +39,12 @@ ASSUMPTIONS = (
 # A single session can legitimately contain thousands of requests. Beyond this the
 # baseline is refused rather than silently truncated into a wrong subtraction.
 MAX_BASELINE_KEYS = 50_000
-# Past this many tokens of carried context, a fresh worker with a short handoff is cheaper
-# to run than one that re-reads everything it has seen on every request, and less exposed
-# to stale instructions from earlier assignments.
-CONTEXT_RETIRE_TOKENS = 200_000
-# Below this, a worker has room to take a natural follow-on without approaching retirement.
-CONTEXT_ROOM_TOKENS = 120_000
+# A worker may take more work only while at least this share of its context window is free.
+CONTEXT_MIN_FREE = 0.30
+# An assignment that alone consumed this share of the window was too large and should be split.
+OVERSIZED_SHARE = 0.30
+# Idle workers are garbage-collected after this many minutes without a new assignment.
+IDLE_GC_MINUTES = 15
 
 
 class UsageError(ValueError):
@@ -277,6 +277,7 @@ def read_usage(path: Path, *, skip_sidechain: bool, exclude: frozenset[str] = fr
     counted = 0
     context = None
     first_context = None
+    last_model = None
     for record in _iter_records(path):
         if skip_sidechain and record.get("isSidechain") is True:
             continue
@@ -298,9 +299,14 @@ def read_usage(path: Path, *, skip_sidechain: bool, exclude: frozenset[str] = fr
             by_effort[effort][name] += value
         counted += 1
         # Every request carries the worker's whole context, so the latest one measures it.
-        context = tokens["input"] + tokens["cache_read"] + tokens["cache_write_5m"] + tokens["cache_write_1h"]
-        if first_context is None:
-            first_context = context
+        current = tokens["input"] + tokens["cache_read"] + tokens["cache_write_5m"] + tokens["cache_write_1h"]
+        # Interrupted or failed requests leave a zero-usage "<synthetic>" placeholder; it says
+        # nothing about the worker's context, so only real requests measure it.
+        if model != "<synthetic>" and current > 0:
+            context = current
+            last_model = model
+            if first_context is None:
+                first_context = context
     return {
         "status": "available",
         "models": {key: value for key, value in by_model.items() if any(value.values())},
@@ -308,8 +314,40 @@ def read_usage(path: Path, *, skip_sidechain: bool, exclude: frozenset[str] = fr
         "requests": counted,
         "context_tokens": context,
         "context_at_start": first_context,
+        "compacted": _compacted_since(path, frozenset(exclude)),
+        "last_model": last_model,
         "keys": sorted(seen | set(exclude)),
     }
+
+
+def _compacted_since(path: Path, baseline: frozenset[str]) -> bool:
+    """Whether Claude Code compacted this transcript after the assignment's baseline requests.
+
+    Compaction is read from Claude Code's own `compact_boundary` marker, not inferred from context
+    size: ordinary requests can shrink by a few percent to half without any compaction.
+    """
+    last_baseline = -1
+    markers: list[int] = []
+    try:
+        with path.open("r", encoding="utf-8") as stream:
+            for index, line in enumerate(stream):
+                if '"compact_boundary"' in line:
+                    try:
+                        raw = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if isinstance(raw, dict) and raw.get("type") == "system" and raw.get("subtype") == "compact_boundary":
+                        markers.append(index)
+                elif baseline and '"assistant"' in line and '"usage"' in line:
+                    try:
+                        raw = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if isinstance(raw, dict) and _request_key(raw) in baseline:
+                        last_baseline = index
+    except (OSError, UnicodeError) as exc:
+        raise UsageError(f"cannot read transcript {path}: {exc}") from exc
+    return any(index > last_baseline for index in markers)
 
 
 def read_keys(path: Path | None, *, skip_sidechain: bool) -> dict[str, Any]:
@@ -454,6 +492,8 @@ def start(args: argparse.Namespace) -> dict[str, Any]:
         raise UsageError("--reason is required when --prior-task links an earlier result")
     agent_key, path, skip_sidechain = _target(args)
     if args.new_agent:
+        if any(e.get("agent_id") == agent_key for e in _goal_events(args.db, args.run)):
+            raise UsageError(f"agent {agent_key} already appears in goal {args.run}; a new agent needs a new id")
         baseline = {"status": "available", "keys": [], "basis": "explicit_new_agent_zero"}
     else:
         baseline = read_keys(path, skip_sidechain=skip_sidechain)
@@ -558,9 +598,7 @@ def finish(args: argparse.Namespace) -> dict[str, Any]:
             totals["requests"] = int(usage.get("requests", 0))
         else:
             cost_status, cost_usd, cost_reason, totals = "unavailable", None, usage_reason, None
-        context_tokens = usage.get("context_tokens") if usage["status"] == "available" else None
-        growth = (context_tokens - usage["context_at_start"]
-                  if context_tokens is not None and usage.get("context_at_start") is not None else None)
+        facts = _context_facts(usage, json.loads(row["tariff_json"]) if row["tariff_json"] else None)
 
         db.execute(
             """UPDATE tasks SET finished_at=?, finished_at_display=?, status='finished', outcome=?,
@@ -583,8 +621,7 @@ def finish(args: argparse.Namespace) -> dict[str, Any]:
             "tokens": totals, "usage_status": usage["status"], "usage_reason": usage_reason,
             "estimated_cost_usd": cost_usd, "cost_status": cost_status,
             "cost_reason": cost_reason, "tariff_version": tariff_version,
-            "actual_models": sorted(models), "actual_efforts": sorted(efforts),
-            "context_tokens": context_tokens})
+            "actual_models": sorted(models), "actual_efforts": sorted(efforts), **facts})
 
     result = {
         "command": "finish", "run": args.run, "task": args.task, "status": "finished",
@@ -597,30 +634,122 @@ def finish(args: argparse.Namespace) -> dict[str, Any]:
         result["usage_reason"] = usage_reason
     if cost_reason:
         result["cost_reason"] = cost_reason
-    if context_tokens is not None:
-        result["context_tokens"] = context_tokens
-        if growth is not None:
-            result["assignment_growth_tokens"] = growth
+    if facts["context_tokens"] is not None:
+        result.update(facts)
         if not skip_sidechain:  # worker advice; the main session is never "reused"
-            result["context_advice"] = _context_advice(context_tokens, growth)
+            result["context_advice"] = _context_advice(facts)
     return result
 
 
-def _context_advice(tokens: int, growth: int | None = None) -> str:
-    if tokens >= CONTEXT_RETIRE_TOKENS:
-        advice = (f"worker context is {tokens:,} tokens, past the {CONTEXT_RETIRE_TOKENS:,} retirement point: "
-                  "start a fresh worker with a short handoff for the next assignment, and shut this one down "
-                  "unless it has a small follow-on that only it can do")
-    elif tokens >= CONTEXT_ROOM_TOKENS:
-        advice = (f"worker context is {tokens:,} tokens: reuse it only for a small follow-on that depends on what "
-                  "it already knows; give anything larger to a new worker")
+def _context_facts(usage: dict[str, Any], tariff: dict[str, Any] | None) -> dict[str, Any]:
+    """The worker's context size against its model's window, and whether it can take more work."""
+    empty = {"context_tokens": None, "context_window": None, "context_free_pct": None, "eligible": None,
+             "compacted": None, "assignment_growth_tokens": None, "oversized": None}
+    if usage.get("status") != "available" or usage.get("context_tokens") is None:
+        return empty
+    tokens = usage["context_tokens"]
+    start = usage.get("context_at_start")
+    growth = tokens - start if start is not None else None
+    compacted = bool(usage.get("compacted"))
+    rates = (tariff or {}).get("models", {}).get(usage.get("last_model") or "", {})
+    window = rates.get("context_window") if isinstance(rates, dict) else None
+    window = window if isinstance(window, int) and not isinstance(window, bool) and window > 0 else None
+    exact_free = (window - tokens) / window if window else None
+    free = round(exact_free * 100, 1) if window else None
+    return {
+        "context_tokens": tokens,
+        "context_window": window,
+        "context_free_pct": free,
+        "eligible": (None if window is None else (not compacted and exact_free >= CONTEXT_MIN_FREE)),
+        "compacted": compacted,
+        "assignment_growth_tokens": growth,
+        "oversized": (None if window is None or growth is None else growth >= window * OVERSIZED_SHARE),
+    }
+
+
+def _context_advice(facts: dict[str, Any]) -> str:
+    tokens, window, free = facts["context_tokens"], facts["context_window"], facts["context_free_pct"]
+    if facts["compacted"]:
+        advice = ("worker's context was compacted during this assignment: retire it now with a stop and do not "
+                  "reuse it, since it has lost the detailed history that made it worth reusing")
+    elif window is None:
+        advice = (f"worker context is {tokens:,} tokens but its model's context window is unknown: judge reuse "
+                  "conservatively and prefer a fresh worker for any substantial follow-on")
+    elif facts["eligible"]:
+        advice = (f"worker has {free}% of its {window:,}-token context free: it can take more work; keep it idle "
+                  f"for a natural follow-on and stop it after {IDLE_GC_MINUTES} idle minutes")
     else:
-        advice = (f"worker context is {tokens:,} tokens: room to reuse it for a natural follow-on, such as fixing "
-                  "or extending its own work or the next step in the same area")
-    if growth is not None and growth >= CONTEXT_RETIRE_TOKENS:
-        advice += (f"; this assignment alone grew its context by {growth:,} tokens, so split work of this size "
-                   "into smaller assignments with their own checkpoints next time")
+        advice = (f"worker has only {free}% of its {window:,}-token context free, under "
+                  f"{int(CONTEXT_MIN_FREE * 100)}%: retire it now with a stop")
+    if facts["oversized"]:
+        advice += (f"; this assignment alone used {facts['assignment_growth_tokens']:,} tokens, at least "
+                   f"{int(OVERSIZED_SHARE * 100)}% of the window, so stage or split similar work next time")
     return advice
+
+
+def _goal_events(db_path: Path, run_id: str) -> list[dict[str, Any]]:
+    path = _goal_log(db_path, run_id)
+    if not path.is_file():
+        return []
+    events = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(record, dict):
+            events.append(record)
+    return events
+
+
+def stop(args: argparse.Namespace) -> dict[str, Any]:
+    """Record that the coordinator stopped a worker, so it no longer counts as idle or reusable."""
+    events = [e for e in _goal_events(args.db, args.run) if e.get("agent_id") == args.agent_id]
+    if not events:
+        raise UsageError(f"no agent {args.agent_id} in goal {args.run}")
+    if events[-1].get("event") == "agent_stopped":
+        return {"command": "stop", "run": args.run, "agent_id": args.agent_id, "idempotent": True}
+    with closing(_connect(args.db)) as db:
+        active = db.execute("SELECT task_id FROM tasks WHERE run_id=? AND agent_id=? AND status='active'",
+                            (args.run, args.agent_id)).fetchone()
+    if active:
+        raise UsageError(f"{args.agent_id} still has active task {active['task_id']}; finish it before stopping")
+    event = {"event": "agent_stopped", "goal_id": args.run, "at": _now(), "agent": events[-1].get("agent"),
+             "agent_id": args.agent_id, "reason": args.reason}
+    _append_goal_event(args.db, args.run, event)
+    return {"command": "stop", "run": args.run, "agent_id": args.agent_id, "idempotent": False, "at": event["at"]}
+
+
+def workers(args: argparse.Namespace) -> dict[str, Any]:
+    """Derive each worker's status and idle time from its last entry in the goal log."""
+    now = datetime.fromisoformat(args.now) if args.now else datetime.now().astimezone()
+    if now.tzinfo is None:
+        raise UsageError("--now must include a timezone offset")
+    by_agent: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for event in _goal_events(args.db, args.run):
+        agent_id = event.get("agent_id")
+        if isinstance(agent_id, str) and not agent_id.startswith("main:"):
+            by_agent[agent_id].append(event)
+    listing = []
+    for agent_id, events in by_agent.items():
+        last = events[-1]
+        results = [e for e in events if e.get("event") == "agent_result"]
+        latest = results[-1] if results else {}
+        status = {"agent_call": "working", "agent_result": "idle", "agent_stopped": "stopped"}.get(last.get("event"), "unknown")
+        idle = None
+        if status == "idle":
+            idle = round((now - datetime.fromisoformat(last["at"])).total_seconds() / 60, 1)
+        eligible, compacted = latest.get("eligible"), latest.get("compacted")
+        listing.append({
+            "agent_id": agent_id, "role": last.get("agent"), "status": status,
+            "tasks": [e["task_id"] for e in events if e.get("event") == "agent_call"],
+            "idle_minutes": idle, "context_tokens": latest.get("context_tokens"),
+            "context_window": latest.get("context_window"), "context_free_pct": latest.get("context_free_pct"),
+            "eligible": eligible, "compacted": compacted,
+            "gc_due": status == "idle" and (idle >= IDLE_GC_MINUTES or eligible is False or bool(compacted)),
+        })
+    return {"command": "workers", "run": args.run, "now": now.isoformat(), "idle_gc_minutes": IDLE_GC_MINUTES,
+            "workers": listing}
 
 
 def report(args: argparse.Namespace) -> dict[str, Any]:
@@ -748,6 +877,15 @@ def _parser() -> argparse.ArgumentParser:
     summary.add_argument("--project-tag")
     summary.add_argument("--mode")
     summary.add_argument("--difficulty", choices=DIFFICULTIES)
+
+    halt = commands.add_parser("stop", help="record that the coordinator stopped a worker")
+    halt.add_argument("--run", required=True)
+    halt.add_argument("--agent-id", required=True)
+    halt.add_argument("--reason", required=True)
+
+    pool = commands.add_parser("workers", help="list workers with status and idle time derived from the goal log")
+    pool.add_argument("--run", required=True)
+    pool.add_argument("--now", help="ISO timestamp with offset to evaluate idle time at (default: now)")
     return parser
 
 
@@ -755,7 +893,8 @@ def main(argv: Sequence[str] | None = None, *, stdout: TextIO = sys.stdout, stde
     try:
         args = _parser().parse_args(argv)
         args.claude_dir = args.claude_dir.expanduser()
-        result = {"start": start, "finish": finish, "report": report}[args.command](args)
+        result = {"start": start, "finish": finish, "report": report, "stop": stop,
+                  "workers": workers}[args.command](args)
         print(json.dumps(result, sort_keys=True), file=stdout)
         return 0
     except (UsageError, OSError, sqlite3.Error) as exc:

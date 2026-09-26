@@ -176,6 +176,20 @@ def open_tasks(state: dict) -> list[dict]:
     return [task for task in state["tasks"] if task["status"] in ("open", "in_progress")]
 
 
+def _unmet(state: dict, task: dict) -> list[str]:
+    status = {t["id"]: t["status"] for t in state["tasks"]}
+    return [dep for dep in task.get("depends_on") or [] if status.get(dep) not in ("done", "dropped")]
+
+
+def ready_tasks(state: dict) -> list[dict]:
+    """Open tasks whose dependencies are all done or dropped, so they can start now."""
+    return [t for t in state["tasks"] if t["status"] == "open" and not _unmet(state, t)]
+
+
+def blocked_tasks(state: dict) -> list[dict]:
+    return [t for t in state["tasks"] if t["status"] == "open" and _unmet(state, t)]
+
+
 # -- hook ----------------------------------------------------------------
 
 
@@ -191,7 +205,8 @@ def _acceptance_lines(state: dict) -> list[str]:
     if verdict["goal_version"] != state["goal"]["version"]:
         return [f"The goal was amended after the last DONE verdict (verdict covered v{verdict['goal_version']}, "
                 f"the goal is now v{state['goal']['version']}). Validate again once the amended goal is met."]
-    return ["Work was recorded after the last DONE verdict. Validate again before finishing."]
+    return ["Work was recorded after the last DONE verdict. Validate again before finishing: a polish "
+            "check if this was a polish round, which only looks for regressions from that round."]
 
 
 def _commands(drive_path: Path) -> list[str]:
@@ -224,15 +239,24 @@ def _block_reason(state: dict, report: dict, drive_path: Path) -> str:
     if "min_iterations" in unmet:
         minimum = report.get("bounds", {}).get("min_iterations")
         lines.append(f"- Minimum iterations not reached ({report.get('iteration_count', 0)} of {minimum}).")
-    tasks = open_tasks(state)
-    if tasks:
-        lines.append("Open tasks:")
+    def listed(heading: str, tasks: list[dict], note=lambda task: "") -> None:
+        if not tasks:
+            return
+        lines.append(heading)
         for task in tasks[:MAX_LISTED_TASKS]:
             owner = f" [{task['owner']}]" if task.get("owner") else ""
-            lines.append(f"- {task['id']}{owner} {task['title']} ({task['status']})")
+            tags = [value for value in (task.get("area"), task.get("family") and f"family {task['family']}") if value]
+            area = f" ({', '.join(tags)})" if tags else ""
+            lines.append(f"- {task['id']}{owner}{area} {task['title']}{note(task)}")
         if len(tasks) > MAX_LISTED_TASKS:
             lines.append(f"- ...and {len(tasks) - MAX_LISTED_TASKS} more")
-    else:
+
+    running = [t for t in state["tasks"] if t["status"] == "in_progress"]
+    listed("In progress:", running)
+    listed("Ready to start:", ready_tasks(state))
+    listed("Waiting on other tasks:", blocked_tasks(state),
+           lambda task: " (after " + ", ".join(_unmet(state, task)) + ")")
+    if not open_tasks(state):
         lines.append("Open tasks: none recorded.")
     validate = ("When you believe the goal is met, dispatch rightsize-validator and record its verdict. "
                 if "acceptance" in unmet else
@@ -370,6 +394,9 @@ def _parser() -> argparse.ArgumentParser:
     task.add_argument("--why")
     task.add_argument("--status", choices=TASK_STATUSES)
     task.add_argument("--source", choices=TASK_SOURCES)
+    task.add_argument("--depends-on", help="comma-separated task ids that must be done first")
+    task.add_argument("--area", help="code area or theme, e.g. installer or frontend/ui, used to match workers")
+    task.add_argument("--family", help="dependency chain this task belongs to, planned as one worker's sequence")
 
     progress = commands.add_parser("progress", help="record meaningful progress")
     progress.add_argument("--drive", required=True, type=Path)
@@ -427,8 +454,14 @@ def _summary(path: Path, state: dict) -> dict:
         "mode": state["mode"],
         "goal_version": state["goal"]["version"],
         "goal": state["goal"]["current"],
-        "open_tasks": [{"id": t["id"], "title": t["title"], "owner": t.get("owner"), "status": t["status"]}
+        "open_tasks": [{"id": t["id"], "title": t["title"], "owner": t.get("owner"), "status": t["status"],
+                        "area": t.get("area"), "depends_on": t.get("depends_on") or []}
                        for t in open_tasks(state)],
+        "ready_tasks": [{"id": t["id"], "title": t["title"], "owner": t.get("owner"), "area": t.get("area"),
+                         "family": t.get("family")}
+                        for t in ready_tasks(state)],
+        "blocked_tasks": [{"id": t["id"], "title": t["title"], "waiting_on": _unmet(state, t)}
+                          for t in blocked_tasks(state)],
         "latest_verdict": None if verdict is None else {"verdict": verdict["verdict"], "reasons": verdict["reasons"],
                                                          "goal_version": verdict["goal_version"]},
         "acceptance_fresh": acceptance_fresh(state),
@@ -481,17 +514,27 @@ def _run(args: argparse.Namespace, now_fn: Callable[[], datetime], env: Mapping[
         _bump(state, work=True)
     elif args.command == "task":
         existing = next((t for t in state["tasks"] if t["id"] == args.id), None)
+        depends = None
+        if args.depends_on is not None:
+            depends = [item.strip() for item in args.depends_on.split(",") if item.strip()]
+            known = {t["id"] for t in state["tasks"]}
+            unknown = [dep for dep in depends if dep not in known or dep == args.id]
+            if unknown:
+                raise DriveError("--depends-on must name other existing tasks: " + ", ".join(unknown))
         if existing is None:
             if not (args.title and args.title.strip()) or not (args.why and args.why.strip()):
                 raise DriveError("a new task needs --title and --why")
             state["tasks"].append({
                 "id": args.id, "title": args.title, "owner": args.owner, "why": args.why,
                 "status": args.status or "open", "source": args.source or "plan",
+                "depends_on": depends or [], "area": args.area, "family": args.family,
                 "added_at": now, "updated_at": now,
             })
         else:
             changes = {k: v for k, v in (("title", args.title), ("owner", args.owner), ("why", args.why),
-                                          ("status", args.status), ("source", args.source)) if v is not None}
+                                          ("status", args.status), ("source", args.source),
+                                          ("depends_on", depends), ("area", args.area),
+                                          ("family", args.family)) if v is not None}
             if not changes:
                 raise DriveError("nothing to update")
             existing.update(changes)

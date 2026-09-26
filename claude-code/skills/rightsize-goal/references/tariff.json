@@ -18,12 +18,12 @@
     "https://platform.claude.com/docs/en/build-with-claude/prompt-caching"
   ],
   "models": {
-    "claude-haiku-4-5": {"input": 1.0, "cache_read": 0.1, "cache_write_5m": 1.25, "cache_write_1h": 2.0, "output": 5.0},
-    "claude-haiku-4-5-20251001": {"input": 1.0, "cache_read": 0.1, "cache_write_5m": 1.25, "cache_write_1h": 2.0, "output": 5.0},
-    "claude-sonnet-5": {"input": 2.0, "cache_read": 0.2, "cache_write_5m": 2.5, "cache_write_1h": 4.0, "output": 10.0},
-    "claude-opus-5": {"input": 5.0, "cache_read": 0.5, "cache_write_5m": 6.25, "cache_write_1h": 10.0, "output": 25.0},
-    "claude-opus-5-5": {"input": 4.0, "cache_read": 0.2, "cache_write_5m": 5.0, "cache_write_1h": 8.0, "output": 20.0},
-    "claude-fable-5-1": {"input": 10.0, "cache_read": 0.25, "cache_write_5m": 12.5, "cache_write_1h": 20.0, "output": 50.0}
+    "claude-haiku-4-5": {"input": 1.0, "cache_read": 0.1, "cache_write_5m": 1.25, "cache_write_1h": 2.0, "output": 5.0, "context_window": 200000},
+    "claude-haiku-4-5-20251001": {"input": 1.0, "cache_read": 0.1, "cache_write_5m": 1.25, "cache_write_1h": 2.0, "output": 5.0, "context_window": 200000},
+    "claude-sonnet-5": {"input": 2.0, "cache_read": 0.2, "cache_write_5m": 2.5, "cache_write_1h": 4.0, "output": 10.0, "context_window": 1000000},
+    "claude-opus-5": {"input": 5.0, "cache_read": 0.5, "cache_write_5m": 6.25, "cache_write_1h": 10.0, "output": 25.0, "context_window": 1000000},
+    "claude-opus-5-5": {"input": 4.0, "cache_read": 0.2, "cache_write_5m": 5.0, "cache_write_1h": 8.0, "output": 20.0, "context_window": 1000000},
+    "claude-fable-5-1": {"input": 10.0, "cache_read": 0.25, "cache_write_5m": 12.5, "cache_write_1h": 20.0, "output": 50.0, "context_window": 1000000}
   },
   "role_models": {
     "rightsize-junior-doer": "claude-haiku-4-5",

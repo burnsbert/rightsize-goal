@@ -106,12 +106,17 @@ idempotent and does not refresh an already-finished task.
 
 `finish` also reports the worker's context size at its latest request (`context_tokens`),
 since every request re-reads everything the worker has seen. A reused teammate's context keeps
-growing across assignments even though each assignment is measured on its own. The helper's
-`context_advice` applies three bands: below 120,000 tokens there is room for a natural follow-on;
-from 120,000 to 200,000, only a small follow-on that depends on what the worker already knows; at
-200,000 or more, start a fresh worker. It also reports `assignment_growth_tokens`, how much this
-assignment alone added, and flags an assignment that grew past 200,000 on its own as work that
-should have been split.
+growing across assignments even though each assignment is measured on its own. Alongside it,
+`finish` reports the model's `context_window` (from the bundled tariff), `context_free_pct`,
+`eligible` (at least 30% of the window free and not compacted), `compacted` (Claude Code wrote a
+`compact_boundary` marker during the assignment), `assignment_growth_tokens` (how much this
+assignment alone added), and `oversized` (that growth reached 30% of the window). All of these
+also go in the goal log.
+
+`task_usage.py workers --run <goal-id>` lists every worker with its status, idle minutes, and
+context facts, derived from its last line in the goal log: working after a call, idle after a
+result, stopped after a stop. It marks a worker `gc_due` once it has been idle 15 minutes, falls
+under 30% free, or is compacted. `task_usage.py stop` records a stop in the log.
 
 The reader depends on Claude Code's local transcript format. If that format changes, or a
 transcript is pruned or missing, the result is an explicit unavailable rather than a guess.

@@ -5,3 +5,6 @@ __pycache__/
 
 # Rightsize Goal project scratch, if this repo is ever a target project
 .rightsize-goal/
+
+# Private notes (never commit dot-prefixed markdown)
+/.*.md

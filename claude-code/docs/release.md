@@ -1,5 +1,34 @@
 # Claude Code release checks
 
+## 1.1.3 verification — September 26, 2026
+
+1.1.3 reworks the worker lifecycle and planning from the omniwatch and everwatch runs' evidence:
+finishing without stopping, eligibility at 30% of the context window free and not compacted,
+marker-based compaction detection, matching finished workers to ready tasks by follow-on type with
+the tier decided on the task's merits (plus a rare borderline exception and one-step-up reuse
+within task families), garbage collection from the goal log (`workers`, `stop`, and the
+`agent_stopped` event), dependencies, areas, and families on tasks, follow-on briefs, ambiguity
+settled before planning, parallel planning, and milestone QA passes. The validator now reads goals
+as a QA engineer or product owner would, rates issues 1 to 10, scopes follow-up rounds to fixes and
+their effects, and a bundled polish round after DONE gets a narrow regression check. `SendMessage`
+is off every role again. The suite (126 tests) and both strict manifest validations pass; each new
+rule has a test that fails when the rule is removed.
+
+`TaskStop` was confirmed against everwatch's transcripts: all ten calls reported "Successfully
+stopped task" for an in-process teammate, and each teammate's transcript ends within seconds of
+its stop. The new `drive.py` reads everwatch's existing goal file, which predates the dependency
+and area fields.
+
+Compaction is read from each host's own marker (Claude Code's `compact_boundary`, Codex's
+`compacted` record), not from context size. Checked against real logs: 450 recent Claude Code
+transcripts gave 5 flags, all with a genuine marker and no false ones, and no zero-usage
+`<synthetic>` record was misread as the worker's context. In 117 Codex session logs, counted
+compactions matched the real records exactly. An earlier size-based rule falsely flagged 62 Codex
+logs, mostly forked child agents whose logs begin with their parent's larger history.
+
+Not yet observed live: a coordinator keeping idle teammates for reuse, matching them to ready
+tasks, and collecting them on the 15-minute and 30%-free rules; and compaction on a real worker.
+
 ## 1.1.2 verification — September 26, 2026
 
 1.1.2 includes the unreleased 1.1.1 changes. Both add worker-lifecycle rules: context reporting

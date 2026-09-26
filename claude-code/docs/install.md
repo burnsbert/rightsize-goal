@@ -130,9 +130,11 @@ assignments with `SendMessage` while its context is still warm. That reuse is th
 the next task is a natural follow-on, such as fixing or extending what the teammate just built or
 the next step in the same area: re-explaining that work to a fresh worker would cost real tokens.
 Work in an unrelated area goes to a fresh teammate instead, because a teammate re-reads everything
-it has seen on every request. The coordinator reuses a teammate freely below 120,000 tokens of
-context, only for small dependent follow-ons up to 200,000, and retires it after that. It shuts
-down teammates it no longer expects to use; every role can accept a shutdown request.
+it has seen on every request. After a teammate finishes, the coordinator keeps it idle for
+follow-ons rather than stopping it, and matches each newly ready task to an idle teammate of the
+right role that worked in the same area. A teammate can take more work only while at least 30% of
+its context window is free and its context has not been compacted. The coordinator stops a
+teammate with `TaskStop` once it has been idle 15 minutes, falls under 30% free, or is compacted.
 
 **With Agent Teams off**, the coordinator omits the name and dispatches an ordinary in-process
 subagent. Everything still works — routing, the escalation gate, the completion gate, and usage

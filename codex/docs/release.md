@@ -1,5 +1,18 @@
 # Codex release checks
 
+## 1.1.3 checks: September 26, 2026
+
+All 65 Codex tests pass, the Codex plugin validator passes, and the two skill copies are
+identical. 1.1.3 brings the worker lifecycle and planning changes shared with Claude Code:
+eligibility at 30% of the reported context window free and not compacted, compaction read from
+Codex's own `compacted` records (a forked child's copied history is not counted), `workers` and
+`stop` commands with an `agent_stopped` log event, unique thread IDs, matching finished agents to
+ready tasks by follow-on type with the role decided on the task's merits, closing idle agents after
+15 minutes (early when the concurrency limit blocks a dispatch), ambiguity settled before planning,
+parallel planning, task families, and milestone QA passes. Compaction detection was checked against
+117 real Codex session logs: counted compactions matched the real records exactly. No live
+coordinator run under 1.1.3 has been observed yet.
+
 ## Current checks: September 25, 2026
 
 All 60 Codex tests passed after the permission configuration changes. After the

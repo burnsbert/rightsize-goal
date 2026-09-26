@@ -1,6 +1,7 @@
 import importlib.util
 import io
 import json
+from datetime import datetime, timedelta
 import sqlite3
 import tempfile
 import unittest
@@ -149,59 +150,129 @@ class TaskUsageTests(unittest.TestCase):
 
     def test_finish_reports_the_workers_context_size_at_the_end(self):
         self.assertEqual(self._start()[0], 0)
-        self._tokens_with_context(5_000, 2_000, window=258_400)
-        self._tokens_with_context(9_000, 4_000, window=258_400)
+        self._tokens_with_context(5_000, 2_000, window=100_000)
+        self._tokens_with_context(9_000, 4_000, window=100_000)
         code, result = self._call("finish", "--run", "run-1", "--task", "task-1", "--outcome", "accepted")
         self.assertEqual(code, 0)
         self.assertEqual(4_000, result["context_tokens"])
-        self.assertEqual(258_400, result["context_window"])
-        self.assertNotIn("fresh", result["context_advice"])
+        self.assertEqual(100_000, result["context_window"])
+        self.assertAlmostEqual(96.0, result["context_free_pct"], places=1)
+        self.assertTrue(result["eligible"])
+        self.assertFalse(result["compacted"])
         logged = [json.loads(line) for line in (self.db.parent / "run-1.jsonl").read_text().splitlines()]
-        self.assertEqual(4_000, logged[-1]["context_tokens"])
+        for field in ("context_tokens", "context_window", "context_free_pct", "eligible", "compacted",
+                      "assignment_growth_tokens", "oversized"):
+            self.assertEqual(result[field], logged[-1][field], field)
 
-    def test_large_context_recommends_a_fresh_worker(self):
-        self.assertEqual(self._start()[0], 0)
-        self._tokens_with_context(200_000, 110_000, window=200_000)
-        _, result = self._call("finish", "--run", "run-1", "--task", "task-1", "--outcome", "accepted")
-        self.assertIn("fresh", result["context_advice"])
-
-    def advice_after(self, last_input, window=None):
+    def advice_after(self, *last_inputs, window=100_000):
         self._tokens_with_context(110, 0, window=window)  # known starting context
         self.assertEqual(self._start()[0], 0)
-        self._tokens_with_context(last_input + 10, last_input, window=window)
+        for index, last in enumerate(last_inputs):
+            self._tokens_with_context(200 + index * 10 + last, last, window=window)
         return self._call("finish", "--run", "run-1", "--task", "task-1", "--outcome", "accepted")[1]
 
-    def test_context_with_room_invites_a_natural_follow_on(self):
-        result = self.advice_after(20_000, window=258_400)
-        self.assertIn("room", result["context_advice"])
+    def test_worker_with_thirty_percent_free_can_take_more_work(self):
+        result = self.advice_after(70_000)
+        self.assertTrue(result["eligible"])
+        self.assertIn("can take more work", result["context_advice"])
 
-    def test_middle_band_allows_only_a_small_dependent_follow_on(self):
-        result = self.advice_after(100_000, window=258_400)
-        self.assertIn("small follow-on", result["context_advice"])
-        self.assertNotIn("fresh", result["context_advice"])
+    def test_worker_under_thirty_percent_free_is_retired(self):
+        result = self.advice_after(70_001)
+        self.assertFalse(result["eligible"])
+        self.assertIn("retire", result["context_advice"])
 
-    def test_assignment_that_alone_outgrew_the_limit_is_flagged_for_splitting(self):
-        result = self.advice_after(usage.CONTEXT_RETIRE_TOKENS + 5_000)
-        self.assertEqual(usage.CONTEXT_RETIRE_TOKENS + 5_000, result["assignment_growth_tokens"])
+    def _compacted(self):
+        self._append({"type": "compacted", "payload": {"message": "", "replacement_history": []}})
+
+    def test_compaction_is_detected_from_the_compacted_record(self):
+        self._tokens_with_context(110, 0, window=100_000)
+        self.assertEqual(self._start()[0], 0)
+        self._tokens_with_context(60_200, 60_000, window=100_000)
+        self._compacted()
+        self._tokens_with_context(68_300, 8_000, window=100_000)
+        result = self._call("finish", "--run", "run-1", "--task", "task-1", "--outcome", "accepted")[1]
+        self.assertTrue(result["compacted"])
+        self.assertFalse(result["eligible"])
+        self.assertIn("compacted", result["context_advice"])
+
+    def test_an_ordinary_context_drop_without_a_record_is_not_compaction(self):
+        result = self.advice_after(51_821, 46_490)
+        self.assertFalse(result["compacted"])
+
+    def test_a_forked_child_starting_below_its_copied_history_is_not_compacted(self):
+        # A forked child's log begins with the parent's history, including the parent's own
+        # compaction, before the child's much smaller context starts.
+        self._tokens_with_context(78_650, 78_540, window=100_000)
+        self._compacted()
+        self.assertEqual(self._call(*self.start_args("task-1", "thread-1", "--new-thread"))[0], 0)
+        self._tokens_with_context(99_950, 21_283, window=100_000)
+        result = self._call("finish", "--run", "run-1", "--task", "task-1", "--outcome", "accepted")[1]
+        self.assertFalse(result["compacted"])
+        self.assertTrue(result["eligible"])
+
+    def test_assignment_that_alone_used_thirty_percent_of_the_window_is_oversized(self):
+        result = self.advice_after(30_000)
+        self.assertEqual(30_000, result["assignment_growth_tokens"])
+        self.assertTrue(result["oversized"])
         self.assertIn("split", result["context_advice"])
 
-    def test_reused_worker_past_the_limit_is_not_blamed_on_this_assignment(self):
-        self._tokens_with_context(110, 0)
+    def test_reused_worker_is_not_blamed_for_inherited_context(self):
+        self._tokens_with_context(110, 0, window=100_000)
         self.assertEqual(self._start()[0], 0)
-        self._tokens_with_context(usage.CONTEXT_RETIRE_TOKENS + 10, usage.CONTEXT_RETIRE_TOKENS)
+        self._tokens_with_context(60_110, 60_000, window=100_000)
         self._call("finish", "--run", "run-1", "--task", "task-1", "--outcome", "accepted")
         self.assertEqual(self._start(task="task-2")[0], 0)
-        self._tokens_with_context(usage.CONTEXT_RETIRE_TOKENS + 5_010, usage.CONTEXT_RETIRE_TOKENS + 5_000)
+        self._tokens_with_context(61_110, 61_000, window=100_000)
         result = self._call("finish", "--run", "run-1", "--task", "task-2", "--outcome", "accepted")[1]
-        self.assertEqual(5_000, result["assignment_growth_tokens"])
-        self.assertIn("fresh", result["context_advice"])
-        self.assertNotIn("split", result["context_advice"])
+        self.assertEqual(1_000, result["assignment_growth_tokens"])
+        self.assertFalse(result["oversized"])
+        self.assertFalse(result["compacted"])
 
-    def test_retirement_point_is_capped_without_a_window(self):
+    def test_unknown_window_is_reported_rather_than_guessed(self):
+        result = self.advice_after(10_000, window=None)
+        self.assertIsNone(result["context_window"])
+        self.assertIsNone(result["eligible"])
+        self.assertIn("unknown", result["context_advice"])
+
+    def start_args(self, task, thread, *extra):
+        return ["start", "--run", "run-1", "--task", task, "--project-tag", "project", "--role", "worker",
+                "--model", "model-a", "--effort", "medium", "--mode", "delegated", "--difficulty", "routine",
+                "--thread-id", thread, "--session", str(self.session), "--tariff", str(self.tariff), *extra]
+
+    def test_new_thread_id_must_be_unique_within_the_goal(self):
+        self.assertEqual(self._call(*self.start_args("task-1", "thread-1", "--new-thread"))[0], 0)
+        self._call("finish", "--run", "run-1", "--task", "task-1", "--outcome", "accepted")
+        code, error = self._call(*self.start_args("task-2", "thread-1", "--new-thread"))
+        self.assertEqual(1, code)
+        self.assertIn("thread-1", error["error"])
+
+    def log(self):
+        return [json.loads(line) for line in (self.db.parent / "run-1.jsonl").read_text().splitlines()]
+
+    def test_stop_records_an_agent_stopped_event(self):
         self.assertEqual(self._start()[0], 0)
-        self._tokens_with_context(200_000, usage.CONTEXT_RETIRE_TOKENS)
-        _, result = self._call("finish", "--run", "run-1", "--task", "task-1", "--outcome", "accepted")
-        self.assertIn("fresh", result["context_advice"])
+        code, error = self._call("stop", "--run", "run-1", "--thread-id", "thread-1", "--reason", "idle")
+        self.assertEqual(1, code)
+        self.assertIn("finish", error["error"])
+        self._call("finish", "--run", "run-1", "--task", "task-1", "--outcome", "accepted")
+        code, _ = self._call("stop", "--run", "run-1", "--thread-id", "thread-1", "--reason", "idle 15 minutes")
+        self.assertEqual(0, code)
+        self.assertEqual(("agent_stopped", "thread-1"), (self.log()[-1]["event"], self.log()[-1]["thread_id"]))
+
+    def test_workers_view_derives_status_and_idle_time_from_the_log(self):
+        self._tokens_with_context(110, 10_000, window=100_000)
+        self.assertEqual(self._start()[0], 0)
+        self._call("finish", "--run", "run-1", "--task", "task-1", "--outcome", "accepted")
+        finished = datetime.fromisoformat(self.log()[-1]["at"])
+        code, view = self._call("workers", "--run", "run-1", "--now", (finished + timedelta(minutes=5)).isoformat())
+        self.assertEqual(0, code)
+        worker = view["workers"][0]
+        self.assertEqual(("thread-1", "idle", False), (worker["thread_id"], worker["status"], worker["gc_due"]))
+        view = self._call("workers", "--run", "run-1", "--now", (finished + timedelta(minutes=20)).isoformat())[1]
+        self.assertTrue(view["workers"][0]["gc_due"])
+        self._call("stop", "--run", "run-1", "--thread-id", "thread-1", "--reason", "idle")
+        view = self._call("workers", "--run", "run-1", "--now", (finished + timedelta(minutes=20)).isoformat())[1]
+        self.assertEqual(("stopped", False), (view["workers"][0]["status"], view["workers"][0]["gc_due"]))
 
     def test_main_session_reports_context_without_worker_advice(self):
         arguments = ["start", "--run", "run-1", "--task", "M001", "--project-tag", "project",

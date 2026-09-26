@@ -68,8 +68,12 @@ as evidence arrives. A task has a coherent outcome and checkpoint; many simple
 repeated steps may share one task, while uncertain implementation and live
 evaluation may need separate assignments.
 
-The coordinator retires workers it no longer expects to use. It closes them
-when the runtime provides a close operation and confirms closure. Otherwise,
+After a worker finishes, the coordinator keeps it idle for follow-ons and matches each newly
+ready task to an idle, eligible agent of the right role that worked in the same area. A worker is
+eligible while at least 30% of its context window is free and it has not been compacted. The
+coordinator retires a worker once it has been idle 15 minutes, falls under 30% free, or is
+compacted, and closes the least likely to be reused early when the concurrency limit blocks a new
+dispatch. It closes workers when the runtime provides a close operation and confirms closure. Otherwise,
 finished workers remain idle and are recorded as retired from future assignments,
 with their actual runtime status retained. Interrupting a worker does not prove
 its thread closed or a concurrency slot was released. If the runtime cannot

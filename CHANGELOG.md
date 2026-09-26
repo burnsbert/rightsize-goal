@@ -1,5 +1,65 @@
 # Changelog
 
+## 1.1.3 — 2026-09-26
+
+### Claude Code
+
+- Workers stay available: a teammate's assignment ends when it delivers its receipt and goes
+  idle, and the coordinator runs `finish` without stopping it. In the everwatch run, stopping
+  every teammate at acceptance had prevented all reuse.
+- A worker can take more work only while at least 30% of its context window is free and its
+  context has not been compacted. `finish` reports `context_window`, `context_free_pct`,
+  `eligible`, `compacted` (from Claude Code's own `compact_boundary` marker), and `oversized`
+  (the assignment alone used 30% or more), and logs them. Model windows are in the tariff.
+- Matching: when a worker finishes, the coordinator decides each ready task's tier on its own
+  merits, then prefers an idle, eligible worker of that tier for which the task is a follow-on:
+  building on its work, the partner to its work, or the same area changed the same way. Ties go
+  to most free context. A worker one tier up may rarely take a genuinely borderline task at the top of
+  its tier, with the reason recorded; the exception only moves work up, never to an
+  underpowered worker, and never reaches the principal or the validator. Matching happens before idle
+  workers are collected.
+- Garbage collection: `task_usage.py workers` derives each worker's status and idle time from its
+  last goal-log line and marks it due once idle 15 minutes, under 30% free, or compacted. The
+  coordinator stops teammates with `TaskStop` (confirmed to end them) and records it with the new
+  `stop` command and an `agent_stopped` log event. The validator is fresh for every verdict.
+- Tasks record `--depends-on` and `--area`; the hook's message separates ready tasks from those
+  still waiting. The skill splits work along natural seams: parallel where independent, staged
+  where sequential, whole with checkpoints where indivisible.
+- Follow-on briefs carry the prior worker's receipt and exact findings, files, and lines.
+- Ambiguity is settled before planning: the coordinator restates the goal as an acceptance
+  checklist, asks about clauses with two reasonable readings, and records the answers as
+  amendments so the validator judges the clarified meaning.
+- Planning splits large independent work into parallel pieces, groups dependent chains into task
+  families (`--family`) planned as one worker's sequence, and defines milestones. A light QA task
+  after each milestone runs the automated tests, checks the milestone against the goal clauses it
+  covers, and checks test coverage; implementation tasks include their tests. Within a family, the
+  family's worker may take the next task one tier above what it would normally need.
+- The validator reads goals naturally, as a QA engineer or product owner would: done is not the
+  same as perfect, and polish or minor inaccuracies go in non-blocking notes rather than failing
+  the goal. Follow-up rounds validate the fixes and their effects instead of starting a fresh
+  review; the coordinator passes them the earlier verdicts. The validator rates every issue from
+  1 to 10, and in a follow-up round only a new regression that is more than a nitpick, or an issue that is
+  not a regression but is rated 7 or higher, can newly fail the goal.
+- After a DONE, the coordinator may run one bundled polish round for worthwhile notes, followed by
+  a narrow polish check that looks only for regressions from that round.
+- `SendMessage` is removed from every role, closing the peer-messaging gap; workers report
+  context compaction in their receipts. New agent IDs must be unique within a goal.
+
+### Codex
+
+- The same lifecycle and matching rule (follow-on types, tier on the task's own merits, a
+  rare one-step-up exception for genuinely borderline tasks, where a step is a model or reasoning-effort level, that never reaches the Astra principal), with
+  finish without closing, eligibility at 30% of the reported window free and
+  not compacted, compaction read from Codex's own `compacted` records (a forked child's copied
+  history is not counted), matching on ready tasks, `workers` and
+  `stop` commands, and closing idle agents after 15 minutes, under 30% free, or compacted. When
+  the concurrency limit blocks a new dispatch, the least likely to be reused idle agent is closed
+  first.
+- Ambiguity settled before planning, parallel planning, task families with one-step-up family
+  reuse, and milestone QA tasks, as on Claude Code.
+- Dependencies, areas, and families are recorded in the goal state's task view; follow-on briefs carry the
+  prior worker's result and exact findings. New thread IDs must be unique within a goal.
+
 ## 1.1.2 — 2026-09-26
 
 ### Claude Code

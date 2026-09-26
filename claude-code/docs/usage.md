@@ -83,6 +83,16 @@ The duration flags belong to the skill. They accept a nonnegative number with se
 minutes, hours, or days, including fractions such as `1.5 hours`. Omitted bounds impose no
 default duration.
 
+## How a run is planned
+
+Before planning anything, the coordinator restates your goal as a short acceptance checklist and
+asks about any clause that could reasonably be read two ways, so the work and the final validation
+both follow the meaning you intend. It then plans along the work's natural seams: independent
+pieces run in parallel, dependent chains become task families that one worker carries through in
+order, and milestones mark points where part of the goal should work end to end. After each
+milestone a light QA task runs the automated tests and checks that milestone against the goal, so
+problems surface while they are cheap to fix rather than at the final validation.
+
 ## Holding the session open
 
 A skill cannot start `/goal` itself, so the plugin ships its own Stop hook. Each time Claude
@@ -99,15 +109,25 @@ going until one of these is true:
 - the run made **no recorded progress** across several continuations, in which case it
   stops and tells you.
 
-Each time the hook keeps the session going, it tells the coordinator what is still unmet and
-which tasks are open, so the next step starts from the plan rather than from scratch. The hook
+Each time the hook keeps the session going, it tells the coordinator what is still unmet, which
+tasks are in progress, which are ready to start, and which are waiting on other tasks, so the next
+step starts from the plan rather than from scratch. The hook
 makes no model call, so it costs nothing in a session without an active goal.
 
 **Validation.** When the coordinator believes the goal is met, it sends `rightsize-validator`
 (Opus 5.5, read-only) the goal text and where to look, but not its own argument that the work
-is done. The validator runs the checks itself and returns DONE or NOT DONE, with a reason for
-each unmet part of the goal. Each reason becomes a new task. If the same reason comes back
-twice, the coordinator changes approach or routes that task to a stronger tier.
+is done. The validator runs the checks itself and reads the goal the way a QA engineer or
+product owner would. Done is not the same as perfect: a real defect or a clause the work plainly
+fails makes it NOT DONE, while polish and minor inaccuracies go in non-blocking notes. It rates
+every issue from 1 to 10 and returns DONE or NOT DONE, with a reason for each unmet part of the
+goal. Each reason becomes a new task. A follow-up round checks those fixes and their effects rather
+than starting a fresh review; only a new regression that is more than a nitpick, or an issue that
+is not a regression but is rated 7 or higher, can newly fail the goal there. After
+a DONE, the coordinator may bundle worthwhile notes into one final polish round, the way a team
+clears small issues before a release, followed by a narrow check that the polish caused no
+regression. If the
+same reason comes back twice, the coordinator changes approach or routes that task to a stronger
+tier.
 
 **Steering.** Talk to it. Changing scope or requirements amends the goal: the coordinator
 records your words alongside the original goal and re-plans, and an earlier DONE no longer

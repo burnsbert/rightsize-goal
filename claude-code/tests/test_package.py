@@ -89,6 +89,13 @@ class PackageTests(unittest.TestCase):
         self.assertIn("Bash", granted)
         self.assertEqual("opus", fields["model"])
 
+    def test_validator_judges_naturally_and_scopes_follow_up_rounds(self):
+        body = (PACKAGE / "agents/rightsize-validator.md").read_text(encoding="utf-8")
+        for rule in ("Done is not the same as perfect", "QA engineer or product owner",
+                     "follow-up round", "Notes", "from 1 to 10", "7 or higher", "polish check"):
+            self.assertIn(rule, body)
+        self.assertNotIn("mostly met is NOT DONE", body)
+
     def test_workers_cannot_spawn_agents(self):
         # The escalation gate depends on workers never dispatching for themselves.
         for name in installer.ROLES:
@@ -98,8 +105,10 @@ class PackageTests(unittest.TestCase):
                 self.assertNotIn("Agent", granted)
                 self.assertNotIn("Task", granted)
                 self.assertIn("Read", granted)
-                # A teammate can only accept a shutdown request by replying through SendMessage.
-                self.assertIn("SendMessage", granted)
+                # The coordinator retires workers with TaskStop; workers must not message each other.
+                self.assertNotIn("SendMessage", granted)
+                body = (PACKAGE / "agents" / f"{name}.md").read_text(encoding="utf-8")
+                self.assertIn("compacted", body, "workers report context compaction in their receipt")
                 # Every role can research online.
                 self.assertTrue({"WebFetch", "WebSearch"} <= granted)
 
@@ -110,6 +119,9 @@ class PackageTests(unittest.TestCase):
                 for field in ("input", "cache_read", "cache_write_5m", "cache_write_1h", "output"):
                     self.assertIsInstance(rates[field], (int, float))
                     self.assertGreater(rates[field], 0)
+                # The worker lifecycle rule (30% of the window free) needs every model's window.
+                self.assertIsInstance(rates["context_window"], int)
+                self.assertGreater(rates["context_window"], 0)
 
     def test_documentation_relative_links_exist(self):
         files = list(REPO.glob("*.md")) + list(PACKAGE.rglob("*.md"))

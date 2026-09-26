@@ -283,6 +283,72 @@ class DriveTests(unittest.TestCase):
             self.assertIn(f"drive.py\" {command} --drive", reason)
         self.assertIn("never edit", reason.lower())
 
+    # -- dependencies and areas -----------------------------------------
+
+    def add(self, task, *extra):
+        code, out, err = self.cli("task", "--drive", str(self.drive_path), "--id", task,
+                                  "--title", f"work {task}", "--why", "goal", *extra)
+        self.assertEqual(0, code, err)
+        return out
+
+    def test_tasks_record_dependencies_and_areas(self):
+        self.start()
+        self.add("T1", "--area", "installer")
+        self.add("T2", "--area", "installer", "--depends-on", "T1")
+        saved = {t["id"]: t for t in json.loads(self.drive_path.read_text(encoding="utf-8"))["tasks"]}
+        self.assertEqual(["T1"], saved["T2"]["depends_on"])
+        self.assertEqual("installer", saved["T2"]["area"])
+
+    def test_tasks_record_a_family_shown_to_the_coordinator(self):
+        self.start()
+        self.add("T1", "--area", "installer", "--family", "install-chain")
+        self.add("T2", "--family", "install-chain", "--depends-on", "T1")
+        saved = {t["id"]: t for t in json.loads(self.drive_path.read_text(encoding="utf-8"))["tasks"]}
+        self.assertEqual("install-chain", saved["T2"]["family"])
+        _, out, _ = self.cli("show", "--drive", str(self.drive_path))
+        self.assertEqual("install-chain", out["ready_tasks"][0]["family"])
+        self.assertIn("install-chain", self.assert_blocks(self.hook()))
+
+    def test_dependencies_must_name_existing_tasks(self):
+        self.start()
+        code, _, err = self.cli("task", "--drive", str(self.drive_path), "--id", "T2", "--title", "x",
+                                "--why", "goal", "--depends-on", "T9")
+        self.assertEqual(1, code)
+        self.assertIn("T9", err["error"])
+
+    def test_hook_separates_ready_tasks_from_blocked_ones(self):
+        self.start()
+        self.add("T1")
+        self.add("T2", "--depends-on", "T1")
+        reason = self.assert_blocks(self.hook())
+        ready, waiting = reason.split("Waiting on other tasks:")
+        self.assertIn("T1", ready)
+        self.assertNotIn("T2 ", ready)
+        self.assertIn("T2", waiting)
+        self.assertIn("after T1", waiting)
+        self.cli("task", "--drive", str(self.drive_path), "--id", "T1", "--status", "done")
+        reason = self.assert_blocks(self.hook())
+        self.assertIn("T2", reason.split("Ready to start:")[1])
+        self.assertNotIn("Waiting on other tasks:", reason)
+
+    def test_show_lists_ready_and_blocked_tasks(self):
+        self.start()
+        self.add("T1")
+        self.add("T2", "--depends-on", "T1")
+        self.add("T3")
+        self.cli("task", "--drive", str(self.drive_path), "--id", "T3", "--status", "dropped")
+        _, out, _ = self.cli("show", "--drive", str(self.drive_path))
+        self.assertEqual(["T1"], [t["id"] for t in out["ready_tasks"]])
+        self.assertEqual(["T2"], [t["id"] for t in out["blocked_tasks"]])
+
+    def test_a_dropped_dependency_does_not_block(self):
+        self.start()
+        self.add("T1")
+        self.add("T2", "--depends-on", "T1")
+        self.cli("task", "--drive", str(self.drive_path), "--id", "T1", "--status", "dropped")
+        _, out, _ = self.cli("show", "--drive", str(self.drive_path))
+        self.assertEqual(["T2"], [t["id"] for t in out["ready_tasks"]])
+
     # -- waiting on workers ----------------------------------------------
 
     def test_in_progress_task_allows_a_quiet_stop_without_counting_a_stall(self):

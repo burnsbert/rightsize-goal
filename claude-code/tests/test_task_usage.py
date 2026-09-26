@@ -4,7 +4,7 @@ import json
 import os
 import tempfile
 import unittest
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
@@ -24,7 +24,7 @@ TARIFF = {
     "models": {
         "test-model": {
             "input": 1.0, "cache_read": 2.0, "cache_write_5m": 4.0,
-            "cache_write_1h": 8.0, "output": 16.0,
+            "cache_write_1h": 8.0, "output": 16.0, "context_window": 100_000,
         }
     },
 }
@@ -179,9 +179,14 @@ class UsageAccountingTests(Fixture):
         self.assertEqual(0, self.start("--new-agent")[0])
         result = self.finish()[1]
         self.assertEqual(1250, result["context_tokens"])
-        self.assertNotIn("fresh", result["context_advice"])
+        self.assertEqual(100_000, result["context_window"])
+        self.assertAlmostEqual(98.8, result["context_free_pct"], places=1)
+        self.assertTrue(result["eligible"])
+        self.assertFalse(result["compacted"])
         logged = [json.loads(line) for line in (self.db.parent / "run-1.jsonl").read_text().splitlines()]
-        self.assertEqual(1250, logged[-1]["context_tokens"])
+        for field in ("context_tokens", "context_window", "context_free_pct", "eligible", "compacted",
+                      "assignment_growth_tokens", "oversized"):
+            self.assertEqual(result[field], logged[-1][field], field)
 
     def test_reused_agent_context_includes_everything_it_has_seen(self):
         self.write(self.agent_file("a1"), [turn("req-1", inp=10, write_5m=40_000, out=5)])
@@ -198,40 +203,132 @@ class UsageAccountingTests(Fixture):
         self.assertEqual(0, self.start("--new-agent")[0])
         return self.finish()[1]
 
-    def test_context_with_room_invites_a_natural_follow_on(self):
-        result = self.advice_for(turn("req-1", inp=10, read=50_000, out=5))
-        self.assertIn("room", result["context_advice"])
-        self.assertNotIn("split", result["context_advice"])
+    def test_worker_with_thirty_percent_free_can_take_more_work(self):
+        result = self.advice_for(turn("req-1", inp=0, read=70_000, out=5))
+        self.assertAlmostEqual(30.0, result["context_free_pct"], places=1)
+        self.assertTrue(result["eligible"])
+        self.assertIn("can take more work", result["context_advice"])
 
-    def test_middle_band_allows_only_a_small_dependent_follow_on(self):
-        result = self.advice_for(turn("req-1", inp=10, read=usage.CONTEXT_ROOM_TOKENS + 10_000, out=5))
-        self.assertIn("small follow-on", result["context_advice"])
-        self.assertNotIn("fresh", result["context_advice"])
+    def test_worker_under_thirty_percent_free_is_retired(self):
+        result = self.advice_for(turn("req-1", inp=0, read=70_001, out=5))
+        self.assertFalse(result["eligible"])
+        self.assertIn("retire", result["context_advice"])
 
-    def test_assignment_that_alone_outgrew_the_limit_is_flagged_for_splitting(self):
+    COMPACT_BOUNDARY = {"type": "system", "subtype": "compact_boundary", "isSidechain": False,
+                        "content": "Conversation compacted"}
+
+    def test_compaction_is_detected_from_the_compact_boundary_marker(self):
         result = self.advice_for(
-            turn("req-1", inp=10, write_5m=20_000, out=5),
-            turn("req-2", inp=10, read=20_000 + usage.CONTEXT_RETIRE_TOKENS, out=5),
+            turn("req-1", inp=10, read=60_000, out=5),
+            self.COMPACT_BOUNDARY,
+            turn("req-2", inp=10, read=8_000, out=5),
         )
-        self.assertEqual(usage.CONTEXT_RETIRE_TOKENS, result["assignment_growth_tokens"])
-        self.assertIn("split", result["context_advice"])
-        self.assertIn("fresh", result["context_advice"])
+        self.assertTrue(result["compacted"])
+        self.assertFalse(result["eligible"])
+        self.assertIn("compacted", result["context_advice"])
 
-    def test_reused_worker_past_the_limit_is_not_blamed_on_this_assignment(self):
-        self.write(self.agent_file("a1"), [turn("req-1", inp=10, read=usage.CONTEXT_RETIRE_TOKENS, out=5)])
+    def test_an_ordinary_context_drop_without_a_marker_is_not_compaction(self):
+        result = self.advice_for(
+            turn("req-1", inp=10, read=598_000, out=5),
+            turn("req-2", inp=10, read=540_000, out=5),
+        )
+        self.assertFalse(result["compacted"])
+
+    def test_synthetic_placeholder_records_do_not_count_as_context(self):
+        synthetic = turn("req-3", model="<synthetic>", inp=0, read=0, out=0)
+        result = self.advice_for(
+            turn("req-1", inp=10, read=20_000, out=5),
+            turn("req-2", inp=10, read=80_000, out=5),
+            synthetic,
+        )
+        self.assertEqual(80_010, result["context_tokens"])
+        self.assertFalse(result["compacted"])
+        self.assertFalse(result["eligible"], "80% full stays ineligible despite the zero placeholder")
+
+    def test_a_marker_from_an_earlier_assignment_does_not_count(self):
+        self.write(self.agent_file("a1"), [
+            turn("req-1", inp=10, read=60_000, out=5), self.COMPACT_BOUNDARY, turn("req-2", inp=10, read=9_000, out=5),
+        ])
+        self.assertEqual(0, self.start("--new-agent")[0])
+        self.assertTrue(self.finish()[1]["compacted"])
+        self.assertEqual(0, self.start(task="T002")[0])
+        self.write(self.agent_file("a1"), [turn("req-3", inp=10, read=12_000, out=5)], append=True)
+        self.assertFalse(self.finish(task="T002")[1]["compacted"])
+
+    def test_assignment_that_alone_used_thirty_percent_of_the_window_is_oversized(self):
+        result = self.advice_for(
+            turn("req-1", inp=10, write_5m=5_000, out=5),
+            turn("req-2", inp=10, read=35_000, out=5),
+        )
+        self.assertEqual(30_000, result["assignment_growth_tokens"])
+        self.assertTrue(result["oversized"])
+        self.assertIn("split", result["context_advice"])
+
+    def test_reused_worker_is_not_blamed_for_inherited_context(self):
+        self.write(self.agent_file("a1"), [turn("req-1", inp=10, read=60_000, out=5)])
         self.assertEqual(0, self.start("--new-agent")[0])
         self.finish()
         self.assertEqual(0, self.start(task="T002")[0])
-        self.write(self.agent_file("a1"), [turn("req-2", inp=10, read=usage.CONTEXT_RETIRE_TOKENS + 5_000, out=5)], append=True)
+        self.write(self.agent_file("a1"), [turn("req-2", inp=10, read=61_000, out=5)], append=True)
         result = self.finish(task="T002")[1]
-        self.assertIn("fresh", result["context_advice"])
-        self.assertNotIn("split", result["context_advice"])
+        self.assertFalse(result["oversized"])
+        self.assertTrue(result["eligible"])
 
-    def test_large_context_recommends_a_fresh_worker(self):
-        self.write(self.agent_file("a1"), [turn("req-1", inp=10, read=usage.CONTEXT_RETIRE_TOKENS, out=5)])
+    def test_unknown_window_is_reported_rather_than_guessed(self):
+        result = self.advice_for(turn("req-1", model="mystery-model", inp=10, read=10_000, out=5))
+        self.assertIsNone(result["context_window"])
+        self.assertIsNone(result["eligible"])
+        self.assertIn("unknown", result["context_advice"])
+
+    def test_new_agent_id_must_be_unique_within_the_goal(self):
+        self.write(self.agent_file("a1"), [turn("req-1", out=5)])
         self.assertEqual(0, self.start("--new-agent")[0])
-        result = self.finish()[1]
-        self.assertIn("fresh", result["context_advice"])
+        self.finish()
+        code, _, error = self.start("--new-agent", task="T002")
+        self.assertEqual(1, code)
+        self.assertIn("a1", error["error"])
+
+    def log(self):
+        return [json.loads(line) for line in (self.db.parent / "run-1.jsonl").read_text().splitlines()]
+
+    def test_stop_records_an_agent_stopped_event(self):
+        self.write(self.agent_file("a1"), [turn("req-1", out=5)])
+        self.assertEqual(0, self.start("--new-agent")[0])
+        code, _, error = self.call("stop", "--run", "run-1", "--agent-id", "a1", "--reason", "idle 15 minutes")
+        self.assertEqual(1, code, "cannot stop an agent with an unfinished assignment")
+        self.assertIn("finish", error["error"])
+        self.finish()
+        code, result, _ = self.call("stop", "--run", "run-1", "--agent-id", "a1", "--reason", "idle 15 minutes")
+        self.assertEqual(0, code)
+        self.assertEqual("agent_stopped", self.log()[-1]["event"])
+        self.assertEqual("a1", self.log()[-1]["agent_id"])
+
+    def test_workers_view_derives_status_and_idle_time_from_the_log(self):
+        self.write(self.agent_file("a1"), [turn("req-1", inp=0, read=10_000, out=5)])
+        self.write(self.agent_file("a2"), [turn("req-2", inp=0, read=80_000, out=5)])
+        self.write(self.agent_file("a3"), [turn("req-3", inp=0, read=5_000, out=5)])
+        self.assertEqual(0, self.start("--new-agent", task="T001", agent="a1")[0])
+        self.finish(task="T001")
+        self.assertEqual(0, self.start("--new-agent", task="T002", agent="a2")[0])
+        self.finish(task="T002")
+        self.assertEqual(0, self.start("--new-agent", task="T003", agent="a3")[0])
+        finished_at = datetime.fromisoformat(self.log()[-1]["at"])
+        now = (finished_at + timedelta(minutes=5)).isoformat()
+        code, view, _ = self.call("workers", "--run", "run-1", "--now", now)
+        self.assertEqual(0, code)
+        workers = {item["agent_id"]: item for item in view["workers"]}
+        self.assertEqual("idle", workers["a1"]["status"])
+        self.assertFalse(workers["a1"]["gc_due"])
+        self.assertTrue(workers["a2"]["gc_due"], "under 30% free")
+        self.assertEqual("working", workers["a3"]["status"])
+        later = (finished_at + timedelta(minutes=20)).isoformat()
+        workers = {item["agent_id"]: item for item in self.call("workers", "--run", "run-1", "--now", later)[1]["workers"]}
+        self.assertTrue(workers["a1"]["gc_due"], "idle 15 minutes or more")
+        self.assertGreaterEqual(workers["a1"]["idle_minutes"], 15)
+        self.call("stop", "--run", "run-1", "--agent-id", "a1", "--reason", "idle")
+        workers = {item["agent_id"]: item for item in self.call("workers", "--run", "run-1", "--now", later)[1]["workers"]}
+        self.assertEqual("stopped", workers["a1"]["status"])
+        self.assertFalse(workers["a1"]["gc_due"])
 
     def test_one_active_assignment_per_agent(self):
         self.write(self.agent_file("a1"), [turn("req-1", out=1)])
@@ -268,7 +365,7 @@ class UsageAccountingTests(Fixture):
 
     def test_main_session_reports_context_without_worker_advice(self):
         self.write(self.session_file(), [
-            turn("req-main", sidechain=False, inp=10, read=usage.CONTEXT_RETIRE_TOKENS, out=10),
+            turn("req-main", sidechain=False, inp=10, read=90_000, out=10),
         ])
         arguments = [
             "start", "--run", "run-1", "--task", "M001", "--project-tag", "proj",
@@ -278,7 +375,7 @@ class UsageAccountingTests(Fixture):
         ]
         self.assertEqual(0, self.call(*arguments)[0])
         result = self.call("finish", "--run", "run-1", "--task", "M001", "--outcome", "accepted")[1]
-        self.assertEqual(10 + usage.CONTEXT_RETIRE_TOKENS, result["context_tokens"])
+        self.assertEqual(90_010, result["context_tokens"])
         self.assertNotIn("context_advice", result)
 
 
