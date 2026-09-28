@@ -19,7 +19,7 @@ Code account and permissions.
 - Claude Code with subagent `model` and `effort` frontmatter support. Verified against
   `2.1.263`, and the `opus` alias was confirmed to serve Opus 5.5 on `2.1.282`; the oldest
   compatible version has not been established.
-- Access to Claude Haiku 4.5, Sonnet 5, Opus 5.5, and Fable 5.1 on your account. Roles for
+- Access to Claude Haiku 4.5, Sonnet 5.5, Opus 5.5, and Fable 5.1 on your account. Roles for
   a model you cannot use will fail at dispatch. See [checking model access](#check-model-access).
 - Python 3.11 or newer for persistent runs using the two helper scripts. No third-party packages.
 - A trusted workspace, if you want `/goal` to hold the session open.
@@ -141,7 +141,7 @@ until then, so the work carries on without you typing "continue".
 - If the run makes no recorded progress for several continuations, the hook lets the
   session stop and says so, rather than spinning.
 
-Opus at `medium` and Sonnet 5 at `high` are capable coordinators; Haiku is not suitable
+Opus at `medium` and Sonnet 5.5 at `high` are capable coordinators; Haiku is not suitable
 for this role. The command name depends on how you installed it:
 
 | Install | Command | What holds the session open |
@@ -174,7 +174,7 @@ See [usage examples, stop and resume, and limitations](docs/usage.md).
 | Role | Model / effort | Intended scope |
 | --- | --- | --- |
 | Junior | Haiku 4.5 | Very basic explicit work |
-| Midlevel | Sonnet 5 / high | Bounded work using established patterns, including moderately complex work needing more judgment |
+| Midlevel | Sonnet 5.5 / high | Bounded work using established patterns, including moderately complex work needing more judgment |
 | Senior | Opus 5.5 / high | Hard implementation, research, brainstorming, and deep interacting constraints |
 | Principal | Fable 5.1 / high | Break-glass only: hardest bounded work after documented Opus struggle |
 | Validator | Opus 5.5 / high, read-only | Checks the finished work against your goal and returns DONE or NOT DONE |

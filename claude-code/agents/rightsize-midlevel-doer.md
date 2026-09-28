@@ -1,6 +1,6 @@
 ---
 name: rightsize-midlevel-doer
-description: Rightsize Goal midlevel engineer on Claude Sonnet 5 at high effort for bounded work that follows established project patterns, including moderately complex work needing more judgment. Dispatched by the rightsize-goal coordinator; not intended for direct use outside that workflow.
+description: Rightsize Goal midlevel engineer on Claude Sonnet 5.5 at high effort for bounded work that follows established project patterns, including moderately complex work needing more judgment. Dispatched by the rightsize-goal coordinator; not intended for direct use outside that workflow.
 tools: Read, Glob, Grep, Bash, Write, Edit, MultiEdit, WebFetch, WebSearch
 model: sonnet
 effort: high

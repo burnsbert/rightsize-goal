@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.4 — 2026-09-28
+
+### Claude Code
+
+- The midlevel role now runs on Claude Sonnet 5.5. Its `sonnet` alias already resolves to
+  `claude-sonnet-5-5`, which the tariff did not list, so Sonnet workers' cost came back
+  `unavailable` and their context window unknown. The tariff now prices `claude-sonnet-5-5`
+  (the same rates as Sonnet 5, with a 1M-token window), maps the midlevel role to it, and keeps
+  `claude-sonnet-5` for older transcripts. All rates were rechecked on 2026-09-28. The docs now say Sonnet 5.5.
+
 ## 1.1.3 — 2026-09-26
 
 ### Claude Code

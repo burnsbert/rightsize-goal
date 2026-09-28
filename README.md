@@ -10,7 +10,7 @@ This repository is organized by host. Each implementation documents its own mode
 installation, and limitations; neither assumes the other's APIs.
 
 - [`claude-code/`](claude-code/) — the Claude Code implementation: a plugin with one skill
-  and five subagent roles across Haiku 4.5, Sonnet 5, Opus 5.5, and Fable 5.1, including an
+  and five subagent roles across Haiku 4.5, Sonnet 5.5, Opus 5.5, and Fable 5.1, including an
   independent validator.
 - [`codex/`](codex/) — the Codex implementation: a skill, five agent roles, and installers.
 

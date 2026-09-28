@@ -10,7 +10,7 @@ configuration:
 ```
 
 The coordinator needs enough judgment to route, verify, and decide acceptance — not a specific
-model. Opus at `medium` and Sonnet 5 at `high` are both capable choices; Haiku is not suitable
+model. Opus at `medium` and Sonnet 5.5 at `high` are both capable choices; Haiku is not suitable
 for this role. A skill's frontmatter can only override model and effort for a single turn, so
 this workflow does not try to set them for you — the session settings above are what actually
 hold.

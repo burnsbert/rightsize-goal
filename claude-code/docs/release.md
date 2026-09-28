@@ -1,5 +1,16 @@
 # Claude Code release checks
 
+## 1.1.4 verification — September 28, 2026
+
+1.1.4 moves the midlevel role to Claude Sonnet 5.5. The role's `sonnet` alias was already being
+served as `claude-sonnet-5-5`: a local subagent defined with `model: sonnet` recorded that
+identifier on September 28. The tariff did not list it, so a real Sonnet 5.5 transcript was
+priced `unavailable` ("no exact tariff entry for served model claude-sonnet-5-5") with an unknown
+context window. With the new tariff the same transcript prices at $0.0572 with a 1,000,000-token
+window. Sonnet 5.5's rates, window, and API default effort (`high`) come from Anthropic's pricing
+and models pages; every other listed rate was rechecked there and is unchanged. The suite
+(126 tests) and both strict manifest validations pass.
+
 ## 1.1.3 verification — September 26, 2026
 
 1.1.3 reworks the worker lifecycle and planning from the omniwatch and everwatch runs' evidence:
