@@ -29,6 +29,13 @@ cached input, and output token counts. Reasoning is already included in output;
 it is not added twice. Rates are copied into each assignment so later edits to
 the tariff cannot change historical calculations.
 
+The GPT-6.1 Sol standard rates are $2 input, $0.10 cached input, and $10 output
+per million tokens. Cached input is half the GPT-6 Sol rate; input and output
+rates are unchanged. The tariff retains `gpt-6-sol` for older transcripts, and
+existing assignment snapshots keep their original rates. Rates were checked
+against [OpenAI API pricing](https://developers.openai.com/api/docs/pricing)
+on September 29, 2026.
+
 The bundled [tariff](../.agents/skills/rightsize-goal/references/tariff.json) links
 the official model pages and has a review/expiry date. Expired or missing tariffs,
 unknown actual models, unsupported cache-write categories, missing telemetry,

@@ -65,7 +65,7 @@ sh codex/install.sh && sh codex/install.sh --verify
 
 ### Use
 
-Open Codex in the project you want to change. Select `gpt-6-sol` with medium
+Open Codex in the project you want to change. Select `gpt-6.1-sol` with medium
 reasoning for the coordinator when available, and select full access before
 delegating. All five workers default to full access and live web research; the
 parent session's active permission settings can override their defaults.

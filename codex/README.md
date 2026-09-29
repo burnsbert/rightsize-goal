@@ -85,7 +85,7 @@ files, not account model entitlement or live goal/subagent behavior.
 
 ## Run
 
-Select `gpt-6-sol` with medium reasoning for the root Codex session, then invoke:
+Select `gpt-6.1-sol` with medium reasoning for the root Codex session, then invoke:
 
 ```text
 Use $rightsize-goal to add regression tests for this project's configuration parser.
@@ -113,9 +113,16 @@ The coordinator routes work among:
 | --- | --- | --- |
 | Junior | Luna/high | Very basic explicit work and factual research without judgment calls |
 | Lower-midlevel | Luna/xhigh | Routine bounded work and evidence gathering using defined criteria |
-| Senior | Sol/medium | Moderate to hard implementation, research, and brainstorming |
-| Staff | Sol/high | Strongest pre-Astra first pass for the most complex work; deep interacting constraints |
+| Senior | GPT-6.1 Sol/medium | Moderate to hard implementation, research, and brainstorming |
+| Staff | GPT-6.1 Sol/high | Strongest pre-Astra first pass for the most complex work; deep interacting constraints |
 | Principal | Astra/medium | Bounded expert work after documented Sol struggle |
+
+In this workflow, Sol means GPT-6.1 Sol (`gpt-6.1-sol`). The coordinator uses
+medium reasoning, as does the senior; the staff uses high reasoning. OpenAI's
+[model documentation](https://developers.openai.com/codex/models/#gpt-6.1-sol)
+describes account and client availability; Enterprise and Edu administrators
+must enable the model. After upgrading, start a fresh Codex session to load the
+updated roles.
 
 Known moderate work goes directly to Sol/medium rather than using Luna as a cheap trial.
 The most complex work goes directly to Sol/high when Astra escalation is a credible

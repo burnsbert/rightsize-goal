@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.1.5 — 2026-09-29
+
+### Codex
+
+- Upgrade the coordinator, senior (medium reasoning), and staff (high reasoning) to
+  `gpt-6.1-sol`. The repository config selects the coordinator model; both distributed
+  skill copies and the usage docs name GPT-6.1 Sol.
+- Add GPT-6.1 Sol to the accounting tariff at $2 input, $0.10 cached input, and $10
+  output per million tokens. Cached input is half the GPT-6 Sol rate; input and output
+  rates are unchanged. All bundled rates were checked against
+  [OpenAI API pricing](https://developers.openai.com/api/docs/pricing) on September 29;
+  the tariff is valid through October 29. Keep GPT-6 Sol for older transcripts and
+  preserve existing ledger snapshots.
+- Bump the Codex plugin to 1.1.5. Start a fresh Codex session after updating.
+
 ## 1.1.4 — 2026-09-28
 
 ### Claude Code

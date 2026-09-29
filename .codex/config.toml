@@ -1,5 +1,7 @@
 # Full-access defaults for the coordinator in this trusted repository.
 # Active session permission overrides still take precedence.
+model = "gpt-6.1-sol"
+model_reasoning_effort = "medium"
 sandbox_mode = "danger-full-access"
 approval_policy = "never"
 web_search = "live"

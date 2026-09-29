@@ -1,6 +1,6 @@
 name = "rightsize-senior-doer"
-description = "Rightsize Goal senior engineer for moderate to hard implementation, research, and brainstorming at Sol/medium."
-model = "gpt-6-sol"
+description = "Rightsize Goal senior engineer for moderate to hard implementation, research, and brainstorming at GPT-6.1 Sol/medium."
+model = "gpt-6.1-sol"
 model_reasoning_effort = "medium"
 sandbox_mode = "danger-full-access"
 approval_policy = "never"

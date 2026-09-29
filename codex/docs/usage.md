@@ -2,7 +2,7 @@
 
 Give the coordinator an objective, observable acceptance conditions, scope, and
 any actual limits. Open Codex in the project you want it to work on. Select
-`gpt-6-sol` at medium reasoning when available. Other root models are disclosed
+`gpt-6.1-sol` at medium reasoning when available. Other root models are disclosed
 as a mismatch; the skill cannot switch the root model for you.
 
 Select full access for the coordinator before delegating. The five worker roles

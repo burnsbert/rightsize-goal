@@ -1,5 +1,23 @@
 # Codex release checks
 
+## 1.1.5 checks: September 29, 2026
+
+All 65 Codex tests pass on macOS with Python 3.13.15. The two skill copies are
+identical. With Codex CLI 0.159.0, an isolated app-server probe discovers the
+freshly installed skill, and an isolated marketplace install loads plugin 1.1.5.
+No user configuration was changed by these checks.
+
+The repository coordinator config, senior role, and staff role select
+`gpt-6.1-sol` at medium, medium, and high reasoning respectively. Model names,
+supported reasoning efforts, and all bundled standard rates were checked against
+the official [model docs](https://developers.openai.com/api/docs/models/gpt-6.1-sol)
+and [API pricing](https://developers.openai.com/api/docs/pricing). A synthetic
+accounting check with 1M input tokens (800K cached) and 100K output tokens prices
+GPT-6.1 Sol at $1.48 and retained GPT-6 Sol at $1.56; reasoning included in output
+is not counted twice. These checks cover configuration and accounting, not live
+model entitlement, delegation quality, or native goal continuation. No live goal
+was run for this model update.
+
 ## 1.1.3 checks: September 26, 2026
 
 All 65 Codex tests pass, the Codex plugin validator passes, and the two skill copies are
@@ -13,7 +31,7 @@ parallel planning, task families, and milestone QA passes. Compaction detection 
 117 real Codex session logs: counted compactions matched the real records exactly. No live
 coordinator run under 1.1.3 has been observed yet.
 
-## Current checks: September 25, 2026
+## September 25, 2026 checks
 
 All 60 Codex tests passed after the permission configuration changes. After the
 worker cleanup instruction changes, skill validation and all seven package tests
