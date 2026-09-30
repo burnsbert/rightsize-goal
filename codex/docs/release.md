@@ -1,5 +1,12 @@
 # Codex release checks
 
+## 1.1.6 checks: September 30, 2026
+
+All 65 Codex tests pass. The two skill copies are identical and pass skill validation.
+An isolated Codex app-server probe discovers the copied skill without a model turn.
+This release changes test-planning instructions only; it has not been exercised in a
+live goal. The current repository-linked skill installation reads the updated source.
+
 ## 1.1.5 checks: September 29, 2026
 
 All 65 Codex tests pass on macOS with Python 3.13.15. The two skill copies are

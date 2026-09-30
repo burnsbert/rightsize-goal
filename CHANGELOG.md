@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.6 — 2026-09-30
+
+### Codex and Claude Code
+
+- Stage tests that consume substantial tokens or time: run one representative test, inspect its result and usage, then decide whether more or parallel runs are justified. Explicit user direction takes precedence. Cheap tests remain unrestricted.
+
 ## 1.1.5 — 2026-09-29
 
 ### Codex

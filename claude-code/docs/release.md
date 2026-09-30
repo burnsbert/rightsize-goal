@@ -1,5 +1,11 @@
 # Claude Code release checks
 
+## 1.1.6 verification — September 30, 2026
+
+The 126-test suite passes, as do strict validation of the root marketplace and
+Claude Code plugin manifests. This release changes test-planning instructions
+only; no live goal or expensive workflow test was run for this wording change.
+
 ## 1.1.4 verification — September 28, 2026
 
 1.1.4 moves the midlevel role to Claude Sonnet 5.5. The role's `sonnet` alias was already being
