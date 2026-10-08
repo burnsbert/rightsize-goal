@@ -27,17 +27,17 @@ Dollar figures are standard-rate API-equivalent estimates, not actual Codex
 subscription charges, credits, or an invoice. The calculation uses uncached input,
 cached input, and output token counts. Reasoning is already included in output;
 it is not added twice. Rates are copied into each assignment so later edits to
-the tariff cannot change historical calculations.
+the price list cannot change historical calculations.
 
 The GPT-6.1 Sol standard rates are $2 input, $0.10 cached input, and $10 output
 per million tokens. Cached input is half the GPT-6 Sol rate; input and output
-rates are unchanged. The tariff retains `gpt-6-sol` for older transcripts, and
+rates are unchanged. The price list retains `gpt-6-sol` for older transcripts, and
 existing assignment snapshots keep their original rates. Rates were checked
 against [OpenAI API pricing](https://developers.openai.com/api/docs/pricing)
 on September 29, 2026.
 
-The bundled [tariff](../.agents/skills/rightsize-goal/references/tariff.json) links
-the official model pages and has a review/expiry date. Expired or missing tariffs,
+The bundled [price list](../.agents/skills/rightsize-goal/references/price-list.json) links
+the official model pages and has a review/expiry date. Expired or missing price lists,
 unknown actual models, unsupported cache-write categories, missing telemetry,
 counter resets, and ambiguous attribution remain explicitly unavailable rather
 than being guessed. Long-context, service-tier, tool, tax, and account-specific
@@ -45,11 +45,11 @@ charges are excluded. Available worker subtotals omit unmeasured root coordinati
 and any work outside the assignment protocol.
 
 Reports group observations by actual model/effort, task mode, difficulty, and
-tariff version. Sample counts, acceptance, rework, failures, and coverage should
+price list version. Sample counts, acceptance, rework, failures, and coverage should
 be read together. Comparing unlike tasks is not proof of savings or capability.
 The `chain_groups` section also joins retries and escalations through `prior_task`
 and groups their complete cost by the initially requested model/effort route and
-tariff-version combination. A chain cost is complete only
+price-list-version combination. A chain cost is complete only
 when every linked assignment has known cost. `partial_chain_links` warns that a
 filter omitted a parent or the recorded links are malformed.
 

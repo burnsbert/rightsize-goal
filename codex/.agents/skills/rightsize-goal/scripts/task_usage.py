@@ -83,7 +83,7 @@ def _connect(path: Path) -> sqlite3.Connection:
           finished_at TEXT, finished_at_display TEXT,
           status TEXT NOT NULL, outcome TEXT, evidence TEXT, lesson TEXT,
           baseline_json TEXT NOT NULL, usage_status TEXT, tokens_json TEXT,
-          actual_models_json TEXT, tariff_json TEXT, cost_status TEXT, cost_usd REAL,
+          actual_models_json TEXT, price_list_json TEXT, cost_status TEXT, cost_usd REAL,
           cost_assumptions TEXT NOT NULL,
           PRIMARY KEY (run_id, task_id)
         );
@@ -92,6 +92,9 @@ def _connect(path: Path) -> sqlite3.Connection:
         """
     )
     columns = {row[1] for row in connection.execute("PRAGMA table_info(tasks)")}
+    # The price list was once called the tariff; carry older ledgers forward.
+    if "tariff_json" in columns and "price_list_json" not in columns:
+        connection.execute("ALTER TABLE tasks RENAME COLUMN tariff_json TO price_list_json")
     for name in ("domain", "started_at_display", "finished_at_display", "actual_efforts_json", "usage_reason", "cost_reason"):
         if name not in columns:
             connection.execute(f"ALTER TABLE tasks ADD COLUMN {name} TEXT")
@@ -288,39 +291,39 @@ def _delta(after: dict[str, Any], before: dict[str, Any]) -> tuple[str, dict[str
     return "available", models, efforts, None
 
 
-def _load_tariff(path: Path | None) -> dict[str, Any] | None:
+def _load_price_list(path: Path | None) -> dict[str, Any] | None:
     if path is None:
         return None
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise UsageError(f"cannot read tariff JSON: {exc}") from exc
+        raise UsageError(f"cannot read price list JSON: {exc}") from exc
     if not isinstance(raw, dict) or not isinstance(raw.get("models"), dict):
-        raise UsageError("tariff JSON must contain a models object")
+        raise UsageError("price list JSON must contain a models object")
     for field in ("version", "verified_on", "valid_until"):
         if not isinstance(raw.get(field), str) or not raw[field]:
-            raise UsageError(f"tariff JSON must contain string field {field}")
+            raise UsageError(f"price list JSON must contain string field {field}")
     try:
         raw["_valid_at_start"] = datetime.fromisoformat(raw["valid_until"]).date() >= datetime.now().astimezone().date()
     except ValueError as exc:
-        raise UsageError("tariff valid_until must be an ISO date") from exc
+        raise UsageError("price list valid_until must be an ISO date") from exc
     if not raw["_valid_at_start"]:
-        raw["_validity_reason"] = f"tariff expired on {raw['valid_until']} before task start"
+        raw["_validity_reason"] = f"price list expired on {raw['valid_until']} before task start"
     return raw
 
 
-def _cost(models: dict[str, dict[str, int]], tariff: dict[str, Any] | None) -> tuple[str, float | None, str | None]:
-    if tariff is None:
-        return "unavailable", None, "no tariff snapshot supplied at start"
-    if tariff.get("_valid_at_start") is False:
-        return "unavailable", None, str(tariff.get("_validity_reason", "tariff was not valid at task start"))
+def _cost(models: dict[str, dict[str, int]], price_list: dict[str, Any] | None) -> tuple[str, float | None, str | None]:
+    if price_list is None:
+        return "unavailable", None, "no price list snapshot supplied at start"
+    if price_list.get("_valid_at_start") is False:
+        return "unavailable", None, str(price_list.get("_validity_reason", "price list was not valid at task start"))
     total = 0.0
     for model, tokens in models.items():
         if tokens.get("cache_write_tokens", 0):
             return "unavailable", None, f"cache-write pricing unsupported for {model}"
-        rates = tariff.get("models", {}).get(model)
+        rates = price_list.get("models", {}).get(model)
         if not isinstance(rates, dict):
-            return "unavailable", None, f"no exact tariff for actual model {model}"
+            return "unavailable", None, f"no exact price list for actual model {model}"
         try:
             # output_tokens already includes reasoning tokens; never add reasoning again.
             uncached = tokens["input_tokens"] - tokens["cached_input_tokens"]
@@ -328,10 +331,10 @@ def _cost(models: dict[str, dict[str, int]], tariff: dict[str, Any] | None) -> t
                 return "unavailable", None, "inconsistent token category totals"
             prices = [float(rates[key]) for key in ("input", "cached_input", "output")]
             if any(not math.isfinite(price) or price < 0 for price in prices):
-                return "unavailable", None, f"invalid tariff for actual model {model}"
+                return "unavailable", None, f"invalid price list for actual model {model}"
             total += (uncached * prices[0] + tokens["cached_input_tokens"] * prices[1] + tokens["output_tokens"] * prices[2]) / 1_000_000
         except (KeyError, TypeError, ValueError):
-            return "unavailable", None, f"invalid tariff for actual model {model}"
+            return "unavailable", None, f"invalid price list for actual model {model}"
     return "known", total, None
 
 
@@ -350,16 +353,16 @@ def start(args: argparse.Namespace) -> dict[str, Any]:
         baseline = {"status": "unavailable", "reason": "session telemetry not found", "models": {}, "resets": 0}
     else:
         baseline = snapshot(session)
-    tariff = _load_tariff(args.tariff)
+    price_list = _load_price_list(args.price_list)
     with closing(_connect(args.db)) as db, db:
         try:
             db.execute(
                 """INSERT INTO tasks(run_id,task_id,project_tag,domain,role,requested_model,requested_effort,mode,difficulty,
-                   thread_id,session_path,prior_task,started_at,started_at_display,status,baseline_json,tariff_json,cost_assumptions)
+                   thread_id,session_path,prior_task,started_at,started_at_display,status,baseline_json,price_list_json,cost_assumptions)
                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (args.run, args.task, args.project_tag, args.domain, args.role, args.model, args.effort, args.mode, args.difficulty,
                  args.thread_id, str(session) if session else None, args.prior_task, _now(), _display_now(), "active",
-                 json.dumps(baseline, sort_keys=True), json.dumps(tariff, sort_keys=True) if tariff else None, ASSUMPTIONS),
+                 json.dumps(baseline, sort_keys=True), json.dumps(price_list, sort_keys=True) if price_list else None, ASSUMPTIONS),
             )
         except sqlite3.IntegrityError as exc:
             existing = db.execute("SELECT run_id,task_id FROM tasks WHERE thread_id=? AND status='active'", (args.thread_id,)).fetchone()
@@ -380,7 +383,7 @@ def finish(args: argparse.Namespace) -> dict[str, Any]:
         if row is None:
             raise UsageError(f"task does not exist: {args.run}/{args.task}")
         if row["status"] == "finished":
-            return {"command": "finish", "run": args.run, "task": args.task, "status": "finished", "idempotent": True, "outcome": row["outcome"], "usage_status": row["usage_status"], "cost_status": row["cost_status"], "cost_usd": row["cost_usd"], "tokens": json.loads(row["tokens_json"]) if row["tokens_json"] else None, "usage_reason": row["usage_reason"], "cost_reason": row["cost_reason"], "cost_assumptions": row["cost_assumptions"], "recorded_at": row["finished_at_display"], "tariff_version": json.loads(row["tariff_json"]).get("version") if row["tariff_json"] else None}
+            return {"command": "finish", "run": args.run, "task": args.task, "status": "finished", "idempotent": True, "outcome": row["outcome"], "usage_status": row["usage_status"], "cost_status": row["cost_status"], "cost_usd": row["cost_usd"], "tokens": json.loads(row["tokens_json"]) if row["tokens_json"] else None, "usage_reason": row["usage_reason"], "cost_reason": row["cost_reason"], "cost_assumptions": row["cost_assumptions"], "recorded_at": row["finished_at_display"], "price_list_version": json.loads(row["price_list_json"]).get("version") if row["price_list_json"] else None}
         supplied = args.session
         if supplied is None and row["session_path"]:
             supplied = Path(row["session_path"])
@@ -392,9 +395,9 @@ def finish(args: argparse.Namespace) -> dict[str, Any]:
             session = None
             after = {"status": "unavailable", "reason": str(exc)}
         usage_status, models, efforts, usage_reason = _delta(after, before)
-        tariff = json.loads(row["tariff_json"]) if row["tariff_json"] else None
+        price_list = json.loads(row["price_list_json"]) if row["price_list_json"] else None
         if usage_status == "available":
-            cost_status, cost_usd, cost_reason = _cost(models, tariff)
+            cost_status, cost_usd, cost_reason = _cost(models, price_list)
         else:
             cost_status, cost_usd, cost_reason = "unavailable", None, usage_reason
         totals = {name: sum(values[name] for values in models.values()) for name in TOKEN_FIELDS} if usage_status == "available" else None
@@ -414,10 +417,10 @@ def finish(args: argparse.Namespace) -> dict[str, Any]:
             "outcome": args.outcome, "evidence": args.evidence, "lesson": args.lesson,
             "tokens": totals, "usage_status": usage_status, "usage_reason": usage_reason,
             "estimated_cost_usd": cost_usd, "cost_status": cost_status,
-            "cost_reason": cost_reason, "tariff_version": tariff.get("version") if tariff else None,
+            "cost_reason": cost_reason, "price_list_version": price_list.get("version") if price_list else None,
             "actual_models": sorted(models), "actual_efforts": sorted(efforts),
             **_context_facts(after, before)})
-    result = {"command": "finish", "run": args.run, "task": args.task, "status": "finished", "idempotent": False, "outcome": args.outcome, "usage_status": usage_status, "tokens": totals, "actual_models": sorted(models), "actual_efforts": sorted(efforts), "cost_status": cost_status, "cost_usd": cost_usd, "tariff_version": tariff.get("version") if tariff else None, "cost_assumptions": ASSUMPTIONS, "recorded_at": _display_now()}
+    result = {"command": "finish", "run": args.run, "task": args.task, "status": "finished", "idempotent": False, "outcome": args.outcome, "usage_status": usage_status, "tokens": totals, "actual_models": sorted(models), "actual_efforts": sorted(efforts), "cost_status": cost_status, "cost_usd": cost_usd, "price_list_version": price_list.get("version") if price_list else None, "cost_assumptions": ASSUMPTIONS, "recorded_at": _display_now()}
     if usage_reason:
         result["usage_reason"] = usage_reason
     if cost_reason:
@@ -552,12 +555,12 @@ def report(args: argparse.Namespace) -> dict[str, Any]:
     for row in rows:
         observed = sorted(json.loads(row["actual_models_json"]).keys()) if row["actual_models_json"] else []
         actual_model = observed[0] if len(observed) == 1 else ("mixed:" + "+".join(observed) if observed else "unknown")
-        tariff_version = "none"
-        if row["tariff_json"]:
-            tariff_version = str(json.loads(row["tariff_json"]).get("version", "unversioned"))
+        price_list_version = "none"
+        if row["price_list_json"]:
+            price_list_version = str(json.loads(row["price_list_json"]).get("version", "unversioned"))
         efforts = sorted(json.loads(row["actual_efforts_json"]).keys()) if row["actual_efforts_json"] else []
         actual_effort = efforts[0] if len(efforts) == 1 else ("mixed:" + "+".join(efforts) if efforts else "unknown")
-        groups[(actual_model, actual_effort, row["mode"], row["difficulty"], tariff_version)].append(row)
+        groups[(actual_model, actual_effort, row["mode"], row["difficulty"], price_list_version)].append(row)
     output = []
     for key, items in sorted(groups.items()):
         known_costs = [float(item["cost_usd"]) for item in items if item["cost_status"] == "known"]
@@ -579,7 +582,7 @@ def report(args: argparse.Namespace) -> dict[str, Any]:
         if known_tokens:
             token_sums["total_tokens"] = token_sums["input_tokens"] + token_sums["output_tokens"]
         latest_lessons = [entry for _, entry in sorted(lessons, key=lambda pair: pair[0])[-5:]]
-        output.append({"model": key[0], "effort": key[1], "mode": key[2], "difficulty": key[3], "tariff_version": key[4], "samples": len(items), "active": sum(item["status"] == "active" for item in items), "accepted": outcomes["accepted"], "rework": outcomes["rework"], "failures": outcomes["failed"], "unresolved": outcomes["unresolved"], "cancelled": outcomes["cancelled"], "unknown_outcomes": sum(item["outcome"] is None for item in items), "actual_models": sorted(actual_models), "token_coverage": {"known": known_tokens, "unknown": len(items) - known_tokens}, "token_totals": token_sums if known_tokens else None, "cost_coverage": {"known": len(known_costs), "unknown": len(items) - len(known_costs)}, "cost_total_usd": sum(known_costs) if known_costs else None, "cost_mean_usd": sum(known_costs) / len(known_costs) if known_costs else None, "lessons": latest_lessons})
+        output.append({"model": key[0], "effort": key[1], "mode": key[2], "difficulty": key[3], "price_list_version": key[4], "samples": len(items), "active": sum(item["status"] == "active" for item in items), "accepted": outcomes["accepted"], "rework": outcomes["rework"], "failures": outcomes["failed"], "unresolved": outcomes["unresolved"], "cancelled": outcomes["cancelled"], "unknown_outcomes": sum(item["outcome"] is None for item in items), "actual_models": sorted(actual_models), "token_coverage": {"known": known_tokens, "unknown": len(items) - known_tokens}, "token_totals": token_sums if known_tokens else None, "cost_coverage": {"known": len(known_costs), "unknown": len(items) - len(known_costs)}, "cost_total_usd": sum(known_costs) if known_costs else None, "cost_mean_usd": sum(known_costs) / len(known_costs) if known_costs else None, "lessons": latest_lessons})
     # Link retries/escalations to the first assignment so cheap attempts are measured
     # together with the work needed to reach an accepted result.
     row_map = {(row["run_id"], row["task_id"]): row for row in rows}
@@ -604,13 +607,13 @@ def report(args: argparse.Namespace) -> dict[str, Any]:
     chain_groups: dict[tuple[str, str, str, str, tuple[str, ...]], list[dict[str, Any]]] = defaultdict(list)
     for root_key, items in chains.items():
         root = row_map[root_key]
-        tariff_versions = tuple(sorted({
-            str(json.loads(item["tariff_json"]).get("version", "unversioned"))
-            if item["tariff_json"] else "none" for item in items
+        price_list_versions = tuple(sorted({
+            str(json.loads(item["price_list_json"]).get("version", "unversioned"))
+            if item["price_list_json"] else "none" for item in items
         }))
         known_costs = [float(item["cost_usd"]) for item in items if item["cost_status"] == "known"]
         complete = all(item["status"] == "finished" and item["cost_status"] == "known" for item in items)
-        chain_groups[(root["requested_model"], root["requested_effort"], root["mode"], root["difficulty"], tariff_versions)].append({
+        chain_groups[(root["requested_model"], root["requested_effort"], root["mode"], root["difficulty"], price_list_versions)].append({
             "accepted": any(item["outcome"] == "accepted" for item in items),
             "followup": len(items) > 1 or any(item["outcome"] == "rework" for item in items),
             "complete_cost": sum(known_costs) if complete else None,
@@ -621,7 +624,7 @@ def report(args: argparse.Namespace) -> dict[str, Any]:
         complete_costs = [item["complete_cost"] for item in items if item["complete_cost"] is not None]
         chain_output.append({
             "initial_requested_model": key[0], "initial_requested_effort": key[1],
-            "mode": key[2], "difficulty": key[3], "tariff_versions": list(key[4]),
+            "mode": key[2], "difficulty": key[3], "price_list_versions": list(key[4]),
             "chains": len(items), "accepted": sum(item["accepted"] for item in items),
             "with_followup": sum(item["followup"] for item in items),
             "complete_cost_coverage": {"known": len(complete_costs), "unknown": len(items) - len(complete_costs)},
@@ -643,7 +646,7 @@ def _parser() -> argparse.ArgumentParser:
     begin.add_argument("--difficulty", required=True, choices=DIFFICULTIES)
     begin.add_argument("--session", type=Path)
     begin.add_argument("--new-thread", action="store_true")
-    begin.add_argument("--tariff", type=Path)
+    begin.add_argument("--price-list", "--tariff", dest="price_list", type=Path)
     begin.add_argument("--prior-task")
     begin.add_argument("--reason", help="why this call is needed, especially after an insufficient result")
     begin.add_argument("--domain")

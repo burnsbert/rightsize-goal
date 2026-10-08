@@ -1,6 +1,6 @@
 ---
 name: rightsize-junior-doer
-description: Rightsize Goal entry-level to junior engineer on Claude Haiku 4.5 for very basic, explicit tasks with clear acceptance criteria. Dispatched by the rightsize-goal coordinator; not intended for direct use outside that workflow.
+description: Rightsize Goal entry-level to junior engineer on Claude Haiku 5.5 for very basic, explicit tasks with clear acceptance criteria. Dispatched by the rightsize-goal coordinator; not intended for direct use outside that workflow.
 tools: Read, Glob, Grep, Bash, Write, Edit, MultiEdit, WebFetch, WebSearch
 model: haiku
 color: green

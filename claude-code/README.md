@@ -19,7 +19,7 @@ Code account and permissions.
 - Claude Code with subagent `model` and `effort` frontmatter support. Verified against
   `2.1.263`, and the `opus` alias was confirmed to serve Opus 5.5 on `2.1.282`; the oldest
   compatible version has not been established.
-- Access to Claude Haiku 4.5, Sonnet 5.5, Opus 5.5, and Fable 5.1 on your account. Roles for
+- Access to Claude Haiku 5.5, Sonnet 5.5, Opus 5.5, and Fable 5.1 on your account. Roles for
   a model you cannot use will fail at dispatch. See [checking model access](#check-model-access).
 - Python 3.11 or newer for persistent runs using the two helper scripts. No third-party packages.
 - A trusted workspace, if you want `/goal` to hold the session open.
@@ -113,7 +113,7 @@ If Fable is unavailable, the principal role will fail at dispatch. The skill
 is instructed to disclose that, treat the highest available tier as the top of the
 ladder, and say in its final report that escalation was capped. Never edit a role to
 point at a different model without also updating
-[`references/tariff.json`](skills/rightsize-goal/references/tariff.json); the ledger
+[`references/price-list.json`](skills/rightsize-goal/references/price-list.json); the ledger
 prices whatever model actually served the request.
 
 ## Run
@@ -173,19 +173,19 @@ See [usage examples, stop and resume, and limitations](docs/usage.md).
 
 | Role | Model / effort | Intended scope |
 | --- | --- | --- |
-| Junior | Haiku 4.5 | Very basic explicit work |
+| Junior | Haiku 5.5 / default (`medium`) | Very basic explicit work |
 | Midlevel | Sonnet 5.5 / high | Bounded work using established patterns, including moderately complex work needing more judgment |
 | Senior | Opus 5.5 / high | Hard implementation, research, brainstorming, and deep interacting constraints |
 | Principal | Fable 5.1 / high | Break-glass only: hardest bounded work after documented Opus struggle |
 | Validator | Opus 5.5 / high, read-only | Checks the finished work against your goal and returns DONE or NOT DONE |
 
-Haiku 4.5 does not take an effort setting, so the junior role pins the model only. Every
+The junior role pins only the model, so it runs at Haiku 5.5's default effort, `medium`. Every
 other role pins both, and the Agent tool has no dispatch-time effort override, which is
 why the roles exist as files rather than as instructions. [Why these roles](docs/roles.md)
 explains the boundaries, what each role can and cannot touch, and how to change them.
 
 Each goal has a unique `.rightsize-goal/<goal-id>.jsonl` call/result log in the target project. Task usage and routing history remain in that project's `.rightsize-goal/usage.sqlite3`. Cost figures are
-standard-rate API-equivalent estimates from a versioned tariff; they are useful for
+standard-rate API-equivalent estimates from a versioned price list; they are useful for
 routing comparisons and are not an authoritative bill. A Claude Code subscription is not
 billed per token at all.
 
@@ -222,9 +222,9 @@ claude plugin validate --strict claude-code/
 
 CI runs the same two commands, so a manifest warning fails the build.
 
-The bundled model tariff has a review date. Once it expires, token accounting continues
+The bundled model price list has a review date. Once it expires, token accounting continues
 while dollar estimates remain unavailable until
-[`references/tariff.json`](skills/rightsize-goal/references/tariff.json) is refreshed
+[`references/price-list.json`](skills/rightsize-goal/references/price-list.json) is refreshed
 from the linked official pricing pages.
 
 See the [contributor guide](../CONTRIBUTING.md) and

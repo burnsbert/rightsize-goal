@@ -36,18 +36,18 @@ class TaskUsageTests(unittest.TestCase):
     def test_invalid_rates_and_inconsistent_categories_are_not_priced(self):
         tokens = {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30, "reasoning_output_tokens": 10, "cache_write_tokens": 0}
         for invalid in (-1, float("nan"), float("inf")):
-            tariff = {"models": {"m": {"input": invalid, "cached_input": .4, "output": 20}}}
-            self.assertEqual(usage._cost({"m": tokens}, tariff)[0], "unavailable")
-        tariff = {"models": {"m": {"input": 4, "cached_input": .4, "output": 20}}}
-        self.assertEqual(usage._cost({"m": {**tokens, "cached_input_tokens": 101}}, tariff)[0], "unavailable")
+            price_list = {"models": {"m": {"input": invalid, "cached_input": .4, "output": 20}}}
+            self.assertEqual(usage._cost({"m": tokens}, price_list)[0], "unavailable")
+        price_list = {"models": {"m": {"input": 4, "cached_input": .4, "output": 20}}}
+        self.assertEqual(usage._cost({"m": {**tokens, "cached_input_tokens": 101}}, price_list)[0], "unavailable")
 
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
         self.db = self.root / "usage.sqlite3"
         self.session = self.root / "rollout-thread-1.jsonl"
-        self.tariff = self.root / "tariff.json"
-        self.tariff.write_text(json.dumps({
+        self.price_list = self.root / "price-list.json"
+        self.price_list.write_text(json.dumps({
             "version": "test-v1", "verified_on": "2026-01-01", "valid_until": "2099-01-01",
             "models": {
                 "model-a": {"input": 4, "cached_input": .4, "output": 20, "source": "https://example/a"},
@@ -86,7 +86,7 @@ class TaskUsageTests(unittest.TestCase):
         arguments = ["start", "--run", run, "--task", task, "--project-tag", "project",
                      "--role", "worker", "--model", "model-a", "--effort", "medium",
                      "--mode", "delegated", "--difficulty", "routine", "--thread-id", "thread-1",
-                     "--session", str(self.session), "--tariff", str(self.tariff)]
+                     "--session", str(self.session), "--price-list", str(self.price_list)]
         if extra.get("prior"):
             arguments += ["--prior-task", extra["prior"]]
         if extra.get("reason"):
@@ -134,7 +134,7 @@ class TaskUsageTests(unittest.TestCase):
         self.assertEqual(result["tokens"]["reasoning_output_tokens"], 15)
         # (70 uncached * 4 + 30 cached * .4 + 40 output * 20) / 1M
         self.assertAlmostEqual(result["cost_usd"], 0.001092)
-        self.assertEqual(result["tariff_version"], "test-v1")
+        self.assertEqual(result["price_list_version"], "test-v1")
         self.assertIn("UTC", result["recorded_at"])
 
     def _tokens_with_context(self, total_input, last_input, window=None):
@@ -237,7 +237,7 @@ class TaskUsageTests(unittest.TestCase):
     def start_args(self, task, thread, *extra):
         return ["start", "--run", "run-1", "--task", task, "--project-tag", "project", "--role", "worker",
                 "--model", "model-a", "--effort", "medium", "--mode", "delegated", "--difficulty", "routine",
-                "--thread-id", thread, "--session", str(self.session), "--tariff", str(self.tariff), *extra]
+                "--thread-id", thread, "--session", str(self.session), "--price-list", str(self.price_list), *extra]
 
     def test_new_thread_id_must_be_unique_within_the_goal(self):
         self.assertEqual(self._call(*self.start_args("task-1", "thread-1", "--new-thread"))[0], 0)
@@ -278,7 +278,7 @@ class TaskUsageTests(unittest.TestCase):
         arguments = ["start", "--run", "run-1", "--task", "M001", "--project-tag", "project",
                      "--role", "main", "--model", "model-a", "--effort", "medium",
                      "--mode", "local", "--difficulty", "hard", "--thread-id", "thread-1",
-                     "--session", str(self.session), "--tariff", str(self.tariff)]
+                     "--session", str(self.session), "--price-list", str(self.price_list)]
         self.assertEqual(self._call(*arguments)[0], 0)
         self._tokens_with_context(200_000, 150_000, window=258_400)
         _, result = self._call("finish", "--run", "run-1", "--task", "M001", "--outcome", "accepted")
@@ -344,7 +344,7 @@ class TaskUsageTests(unittest.TestCase):
         self.assertEqual(self._start()[0], 0)
         self._tokens(120, 25, 35, 12)
         self._call("finish", "--run", "run-1", "--task", "task-1", "--outcome", "accepted", "--lesson", "keep it bounded")
-        # A new thread baseline is explicitly zero; no tariff makes its cost unknown, not zero.
+        # A new thread baseline is explicitly zero; no price list makes its cost unknown, not zero.
         code, _ = self._call("start", "--run", "run-2", "--task", "task-2", "--project-tag", "other",
                              "--role", "worker", "--model", "model-a", "--effort", "low", "--mode", "local",
                              "--difficulty", "basic", "--thread-id", "fresh-thread", "--new-thread")
@@ -358,10 +358,10 @@ class TaskUsageTests(unittest.TestCase):
         self.assertEqual(group["lessons"][0]["lesson"], "keep it bounded")
         self.assertEqual(group["lessons"][0]["task"], "task-1")
 
-    def test_expired_tariff_keeps_usage_but_marks_cost_unavailable(self):
-        tariff = json.loads(self.tariff.read_text(encoding="utf-8"))
-        tariff["valid_until"] = "2000-01-01"
-        self.tariff.write_text(json.dumps(tariff), encoding="utf-8")
+    def test_expired_price_list_keeps_usage_but_marks_cost_unavailable(self):
+        price_list = json.loads(self.price_list.read_text(encoding="utf-8"))
+        price_list["valid_until"] = "2000-01-01"
+        self.price_list.write_text(json.dumps(price_list), encoding="utf-8")
         self.assertEqual(self._start()[0], 0)
         self._tokens(105, 21, 32, 11)
         result = self._call("finish", "--run", "run-1", "--task", "task-1", "--outcome", "accepted")[1]
@@ -391,13 +391,44 @@ class TaskUsageTests(unittest.TestCase):
         arguments = ["start", "--run", "run-1", "--task", "task-2", "--project-tag", "other",
                      "--role", "worker", "--model", "model-a", "--effort", "medium", "--mode", "delegated",
                      "--difficulty", "routine", "--thread-id", "thread-1", "--session", str(self.session),
-                     "--tariff", str(self.tariff), "--prior-task", "task-1", "--reason", "rework needed"]
+                     "--price-list", str(self.price_list), "--prior-task", "task-1", "--reason", "rework needed"]
         self.assertEqual(self._call(*arguments)[0], 0)
         self._tokens(115, 23, 36, 12)
         self._call("finish", "--run", "run-1", "--task", "task-2", "--outcome", "accepted")
         report = self._call("report", "--project-tag", "other")[1]
         self.assertEqual(1, report["partial_chain_links"])
 
+    def test_the_legacy_tariff_flag_is_still_accepted(self):
+        arguments = ["start", "--run", "run-1", "--task", "task-1", "--project-tag", "project",
+                     "--role", "worker", "--model", "model-a", "--effort", "medium",
+                     "--mode", "delegated", "--difficulty", "routine", "--thread-id", "thread-1",
+                     "--session", str(self.session), "--tariff", str(self.price_list)]
+        self.assertEqual(0, self._call(*arguments)[0])
+        self._tokens(110, 22, 33, 11)
+        result = self._call("finish", "--run", "run-1", "--task", "task-1", "--outcome", "accepted")[1]
+        self.assertEqual("known", result["cost_status"])
+        self.assertEqual("test-v1", result["price_list_version"])
+
+    def test_a_ledger_written_before_the_rename_is_migrated(self):
+        # The price list was once called the tariff; recreate a ledger from that era.
+        connection = usage._connect(self.db)
+        connection.execute("ALTER TABLE tasks RENAME COLUMN price_list_json TO tariff_json")
+        connection.execute(
+            """INSERT INTO tasks(run_id, task_id, project_tag, role, requested_model, requested_effort,
+                   mode, difficulty, thread_id, started_at, status, baseline_json, tariff_json,
+                   cost_assumptions, cost_status, cost_usd)
+               VALUES('run-1','task-0','project','worker','model-a','medium','delegated','routine',
+                      'old-thread','2026-01-01T00:00:00+00:00','finished','{}',?,'x','known',0.5)""",
+            (json.dumps({"version": "old-rates"}),),
+        )
+        connection.commit()
+        connection.close()
+        report = self._call("report", "--run", "run-1")[1]
+        self.assertIn("old-rates", [group["price_list_version"] for group in report["groups"]])
+        self.assertEqual(0, self._start()[0])
+        self._tokens(110, 22, 33, 11)
+        result = self._call("finish", "--run", "run-1", "--task", "task-1", "--outcome", "accepted")[1]
+        self.assertEqual("known", result["cost_status"])
 
 if __name__ == "__main__":
     unittest.main()

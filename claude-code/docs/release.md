@@ -1,5 +1,29 @@
 # Claude Code release checks
 
+## 1.1.7 verification — October 8, 2026
+
+All 133 Claude Code tests pass, as does strict validation of the root marketplace and plugin
+manifests. Each new behavior was broken on purpose to confirm its test fails, then restored.
+That covers the long-prompt threshold boundary, cache reads and cache writes counting toward
+it, the higher rate card, a malformed card, the caveat in each of `finish`, a repeat `finish`,
+`report`, and the goal log, the legacy `--tariff` flag, and migration of a pre-rename ledger.
+
+Every rate in the price list was compared against the official pricing page on October 8. All
+match after correcting Sonnet 5.5 cache reads from $0.20 to $0.10.
+
+On Claude Code `2.1.294` the `haiku` alias resolved to `claude-haiku-5-5`. A live junior
+dispatch as a plain in-process subagent recorded `claude-haiku-5-5` at effort `medium`, in a
+session running at `xhigh`. The helper prices that transcript at $0.00097845 (7,816 tokens,
+almost all 5-minute cache writes), which matches a hand calculation; 1.1.6 reported it
+unavailable. An isolated install (`CLAUDE_CONFIG_DIR`) reported plugin 1.1.7 with one skill,
+five agents, and one Stop hook, and its installed helper and price list priced the same
+transcript identically. A copy of a real 1.1.6 ledger with seven tasks migrated, and its report
+was identical before and after.
+
+Not covered: the junior role dispatched as an Agent Teams teammate, whose effort on that path
+was not checked; a real transcript with a prompt over 100,000 tokens, so the higher Haiku card
+is verified only on synthetic transcripts; and a live goal, which was not run.
+
 ## 1.1.6 verification — September 30, 2026
 
 The 126-test suite passes, as do strict validation of the root marketplace and
@@ -164,7 +188,7 @@ rather than assumed. Do not describe this review as a guarantee of error-free be
 python3 -m unittest discover -s claude-code/tests -p "test_*.py"
 ```
 
-They cover package consistency (manifests, role frontmatter, role-to-tariff agreement,
+They cover package consistency (manifests, role frontmatter, role-to-price-list agreement,
 component placement, every rate category priced, no worker granted a spawn tool,
 documentation link targets), installer behavior (copy, symlink, verify, conflict, backup,
 rollback on partial copy, rollback on verification failure, source/destination overlap,
@@ -237,9 +261,9 @@ at the same role. Dispatch overhead, not model rate, dominates the cost of small
   holds an unvalidated goal open, releases on a fresh DONE, a pause, or a reached limit, and
   stands down under `/goal`. Check `/goal` set, held, and self-cleared.
 - Check model availability on the intended account. Never infer it from API prices.
-- Recheck tariff expiry and the linked rates, including the cache-write multipliers. Change
-  the tariff version when rates change; do not rewrite historical ledger snapshots.
-- Confirm `role_models` in the tariff still matches every role file's `model` alias.
+- Recheck price list expiry and the linked rates, including the cache-write multipliers. Change
+  the price list version when rates change; do not rewrite historical ledger snapshots.
+- Confirm `role_models` in the price list still matches every role file's `model` alias.
 - Ensure no credentials, local logs, databases, or private backups enter the release.
 - Include the root MIT `LICENSE`, the docs, the skill helpers and references, the hook, and
   all five roles in any downloadable bundle.

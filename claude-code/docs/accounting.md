@@ -51,9 +51,11 @@ The complete assignment protocol and examples are in the bundled
 
 ## Interpreting results
 
-Dollar figures are standard-rate API-equivalent estimates. They are not an invoice, and a
-Claude Code subscription is not billed per token at all. Treat them as a common comparison
-basis for routing decisions.
+Dollar figures are rough estimates at Claude API list prices. They are not an invoice, not
+exact figures, and not what a Claude Code subscription costs, since a subscription is not
+billed per token at all. Treat them as a common comparison basis for routing decisions.
+`finish` and `report` include this caveat as `cost_caveat`, and the coordinator states it
+whenever it shows you a dollar figure.
 
 Five categories are priced separately, because they carry different rates:
 
@@ -71,20 +73,27 @@ rather than assuming a TTL. In practice a subagent's system prompt is billed as 
 write on its first turn, which is why every dispatch has a floor price even when the worker
 does almost nothing.
 
+Claude Haiku 5.5 has two rate cards: one for prompts up to 100,000 tokens and one, five times
+higher, for longer prompts. The helper picks the card per request. The pricing page does not
+say whether cached tokens count toward the prompt size, so the helper assumes uncached input,
+cache reads, and cache writes all count. That assumption is the main reason Haiku 5.5 figures
+are approximate. `finish` reports how many requests used the higher card as
+`long_prompt_requests`.
+
 Rates come from the bundled
-[tariff](../skills/rightsize-goal/references/tariff.json), which links the official pricing
+[price list](../skills/rightsize-goal/references/price-list.json), which links the official pricing
 pages and carries a review date. Rates are copied into each assignment at `start`, so later
-edits to the tariff cannot change historical calculations.
+edits to the price list cannot change historical calculations.
 
 The following stay explicitly unavailable rather than being guessed: an expired or missing
-tariff, a served model with no exact tariff entry, a cache-write total without its TTL
+price list, a served model with no exact price list entry, a cache-write total without its TTL
 split, a record without request identity, a missing transcript, and an ambiguous transcript
 match. In each case attributable tokens are preserved where they are known, and only the
-dollar figure is withheld. Long-context and service-tier modifiers, server tool charges,
+dollar figure is withheld. Service-tier modifiers, server tool charges,
 batch discounts, taxes, and account-specific pricing are excluded throughout. Available
 worker subtotals omit unmeasured coordination and any work outside the assignment protocol.
 
-Reports group observations by actual model, actual effort, task mode, difficulty, and tariff
+Reports group observations by actual model, actual effort, task mode, difficulty, and price list
 version. Sample counts, acceptance, rework, failures, and coverage should be read together.
 Comparing unlike tasks is not proof of savings or capability.
 
@@ -107,7 +116,7 @@ idempotent and does not refresh an already-finished task.
 `finish` also reports the worker's context size at its latest request (`context_tokens`),
 since every request re-reads everything the worker has seen. A reused teammate's context keeps
 growing across assignments even though each assignment is measured on its own. Alongside it,
-`finish` reports the model's `context_window` (from the bundled tariff), `context_free_pct`,
+`finish` reports the model's `context_window` (from the bundled price list), `context_free_pct`,
 `eligible` (at least 30% of the window free and not compacted), `compacted` (Claude Code wrote a
 `compact_boundary` marker during the assignment), `assignment_growth_tokens` (how much this
 assignment alone added), and `oversized` (that growth reached 30% of the window). All of these

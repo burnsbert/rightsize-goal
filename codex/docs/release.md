@@ -1,5 +1,13 @@
 # Codex release checks
 
+## 1.1.7 checks: October 8, 2026
+
+All 67 Codex tests pass. The two skill copies are identical, and an isolated app-server probe
+with Codex CLI 0.160.0 discovers the freshly installed skill without a model turn. This
+release renames the bundled `tariff.json` to `price-list.json` and the `--tariff` flag to
+`--price-list`, which keeps accepting `--tariff`. A pre-rename ledger is migrated in place;
+new tests cover both. No models or rates changed, and no live goal was run.
+
 ## 1.1.6 checks: September 30, 2026
 
 All 65 Codex tests pass. The two skill copies are identical and pass skill validation.
@@ -118,7 +126,7 @@ error-free behavior.
 - Test a requested stop and a resumed run using the same gate. On hosts exposing
   native goals, check native completion as well as local gate completion.
 - Check model availability on the intended account; never infer it from API prices.
-- Recheck tariff expiry and linked rates. Change the tariff version when rates change;
+- Recheck price list expiry and linked rates. Change the price list version when rates change;
   do not rewrite historical ledger snapshots.
 - Ensure no credentials, local logs, databases, or private backups enter the release.
 - Include the root MIT `LICENSE`, docs, skill helpers/references, and all five roles

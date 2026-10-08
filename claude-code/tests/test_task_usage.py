@@ -2,8 +2,10 @@ import importlib.util
 import io
 import json
 import os
+import sqlite3
 import tempfile
 import unittest
+from contextlib import closing
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
@@ -17,7 +19,7 @@ usage = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None
 SPEC.loader.exec_module(usage)
 
-TARIFF = {
+PRICE_LIST = {
     "version": "test-rates-1",
     "verified_on": "2026-01-01",
     "valid_until": "2999-01-01",
@@ -25,7 +27,16 @@ TARIFF = {
         "test-model": {
             "input": 1.0, "cache_read": 2.0, "cache_write_5m": 4.0,
             "cache_write_1h": 8.0, "output": 16.0, "context_window": 100_000,
-        }
+        },
+        # Priced like Claude Haiku 5.5: a second rate card above a prompt-size threshold.
+        "tiered-model": {
+            "input": 1.0, "cache_read": 2.0, "cache_write_5m": 4.0,
+            "cache_write_1h": 8.0, "output": 16.0, "context_window": 100_000,
+            "long_prompt": {
+                "over_tokens": 1000, "input": 100.0, "cache_read": 200.0,
+                "cache_write_5m": 400.0, "cache_write_1h": 800.0, "output": 1600.0,
+            },
+        },
     },
 }
 
@@ -62,8 +73,8 @@ class Fixture(unittest.TestCase):
         self.subagents = self.claude / "projects" / "-tmp-proj" / self.session / "subagents"
         self.subagents.mkdir(parents=True)
         self.db = self.root / "usage.sqlite3"
-        self.tariff = self.root / "tariff.json"
-        self.tariff.write_text(json.dumps(TARIFF), encoding="utf-8")
+        self.price_list = self.root / "price-list.json"
+        self.price_list.write_text(json.dumps(PRICE_LIST), encoding="utf-8")
 
     def tearDown(self):
         self.temporary.cleanup()
@@ -89,7 +100,7 @@ class Fixture(unittest.TestCase):
         error = json.loads(err.getvalue()) if err.getvalue().strip() else None
         return code, payload, error
 
-    def start(self, *extra, task="T001", agent="a1", tariff=True):
+    def start(self, *extra, task="T001", agent="a1", price_list=True):
         arguments = [
             "start", "--run", "run-1", "--task", task, "--project-tag", "proj",
             "--role", "rightsize-midlevel-doer", "--model", "test-model",
@@ -97,8 +108,8 @@ class Fixture(unittest.TestCase):
         ]
         if agent is not None:
             arguments += ["--agent-id", agent]
-        if tariff:
-            arguments += ["--tariff", str(self.tariff)]
+        if price_list:
+            arguments += ["--price-list", str(self.price_list)]
         return self.call(*arguments, *extra)
 
     def finish(self, task="T001", outcome="accepted", *extra):
@@ -123,7 +134,7 @@ class UsageAccountingTests(Fixture):
         self.assertEqual(0, self.start("--prior-task", "T001", "--reason", "acceptance check failed", task="T002")[0])
         self.write(self.agent_file("a1"), [turn("req-2", inp=10, out=5)], append=True)
         self.assertEqual(0, self.finish(task="T002")[0])
-        self.assertEqual(0, self.call("start", "--run", "run-2", "--task", "T001", "--project-tag", "proj", "--role", "worker", "--model", "test-model", "--effort", "medium", "--mode", "implement", "--difficulty", "routine", "--agent-id", "a2", "--new-agent", "--tariff", str(self.tariff))[0])
+        self.assertEqual(0, self.call("start", "--run", "run-2", "--task", "T001", "--project-tag", "proj", "--role", "worker", "--model", "test-model", "--effort", "medium", "--mode", "implement", "--difficulty", "routine", "--agent-id", "a2", "--new-agent", "--price-list", str(self.price_list))[0])
         log = [json.loads(line) for line in (self.root / "run-1.jsonl").read_text().splitlines()]
         self.assertEqual(["agent_call", "agent_result", "agent_call", "agent_result"], [e["event"] for e in log])
         self.assertTrue(all(e["agent"] == "rightsize-midlevel-doer" and e["goal_id"] == "run-1" for e in log))
@@ -151,6 +162,43 @@ class UsageAccountingTests(Fixture):
         self.assertEqual(["medium"], result["actual_efforts"])
         self.assertEqual(1, result["tokens"]["requests"])
         self.assertEqual(15000, result["tokens"]["total_tokens"])
+
+    def test_requests_over_the_long_prompt_threshold_use_the_higher_rate_card(self):
+        self.write(self.agent_file("a1"), [
+            turn("req-1", model="tiered-model", inp=500, out=10),
+            # Cache reads count toward the prompt size: 10 + 995 = 1005 > 1000.
+            turn("req-2", model="tiered-model", inp=10, read=995, out=10),
+            # Exactly at the threshold is not over it.
+            turn("req-3", model="tiered-model", inp=1000, out=1),
+        ])
+        self.assertEqual(0, self.start("--new-agent")[0])
+        result = self.finish()[1]
+        base = (500 * 1 + 10 * 16) + (1000 * 1 + 1 * 16)
+        long = 10 * 100 + 995 * 200 + 10 * 1600
+        self.assertEqual("known", result["cost_status"])
+        self.assertAlmostEqual((base + long) / 1_000_000, result["cost_usd"])
+        self.assertEqual(1, result["tokens"]["long_prompt_requests"])
+
+    def test_cache_writes_count_toward_the_long_prompt_threshold(self):
+        self.write(self.agent_file("a1"), [
+            turn("req-1", model="tiered-model", inp=1, write_5m=600, write_1h=400, out=2),
+        ])
+        self.assertEqual(0, self.start("--new-agent")[0])
+        result = self.finish()[1]
+        self.assertAlmostEqual((1 * 100 + 600 * 400 + 400 * 800 + 2 * 1600) / 1_000_000, result["cost_usd"])
+
+    def test_cost_caveat_accompanies_every_price(self):
+        self.write(self.agent_file("a1"), [turn("req-1", inp=100, out=20)])
+        self.assertEqual(0, self.start("--new-agent")[0])
+        first = self.finish()[1]
+        repeat = self.finish()[1]
+        report = self.call("report", "--run", "run-1")[1]
+        logged = [json.loads(line) for line in (self.db.parent / "run-1.jsonl").read_text().splitlines()][-1]
+        for where, payload in (("finish", first), ("repeat finish", repeat), ("report", report), ("log", logged)):
+            with self.subTest(where=where):
+                caveat = payload["cost_caveat"]
+                for phrase in ("rough estimate", "API", "subscription", "not an exact figure"):
+                    self.assertIn(phrase, caveat)
 
     def test_streaming_duplicates_of_one_request_count_once(self):
         record = turn("req-1", inp=10, write_5m=100, out=5)
@@ -356,7 +404,7 @@ class UsageAccountingTests(Fixture):
             "start", "--run", "run-1", "--task", "M001", "--project-tag", "proj",
             "--role", "coordinator", "--model", "test-model", "--effort", "medium",
             "--mode", "implement", "--difficulty", "hard", "--main",
-            "--session-id", self.session, "--new-agent", "--tariff", str(self.tariff),
+            "--session-id", self.session, "--new-agent", "--price-list", str(self.price_list),
         ]
         self.assertEqual(0, self.call(*arguments)[0])
         result = self.call("finish", "--run", "run-1", "--task", "M001", "--outcome", "accepted")[1]
@@ -371,7 +419,7 @@ class UsageAccountingTests(Fixture):
             "start", "--run", "run-1", "--task", "M001", "--project-tag", "proj",
             "--role", "main", "--model", "test-model", "--effort", "medium",
             "--mode", "implement", "--difficulty", "hard", "--main",
-            "--session-id", self.session, "--new-agent", "--tariff", str(self.tariff),
+            "--session-id", self.session, "--new-agent", "--price-list", str(self.price_list),
         ]
         self.assertEqual(0, self.call(*arguments)[0])
         result = self.call("finish", "--run", "run-1", "--task", "M001", "--outcome", "accepted")[1]
@@ -404,11 +452,22 @@ class HonestGapTests(Fixture):
         self.assertEqual("available", result["usage_status"])
         self.assertEqual(42, result["tokens"]["output"])
         self.assertEqual("unavailable", result["cost_status"])
-        self.assertIn("no exact tariff entry", result["cost_reason"])
+        self.assertIn("no exact price list entry", result["cost_reason"])
 
-    def test_expired_tariff_keeps_tokens_and_drops_cost(self):
-        expired = dict(TARIFF, valid_until=str(date.today() - timedelta(days=1)))
-        self.tariff.write_text(json.dumps(expired), encoding="utf-8")
+    def test_malformed_long_prompt_card_keeps_tokens_and_drops_cost(self):
+        broken = json.loads(json.dumps(PRICE_LIST))
+        del broken["models"]["tiered-model"]["long_prompt"]["cache_read"]
+        self.price_list.write_text(json.dumps(broken), encoding="utf-8")
+        self.write(self.agent_file("a1"), [turn("req-1", model="tiered-model", inp=10, out=42)])
+        self.assertEqual(0, self.start("--new-agent")[0])
+        result = self.finish()[1]
+        self.assertEqual(42, result["tokens"]["output"])
+        self.assertEqual("unavailable", result["cost_status"])
+        self.assertIn("long_prompt", result["cost_reason"])
+
+    def test_expired_price_list_keeps_tokens_and_drops_cost(self):
+        expired = dict(PRICE_LIST, valid_until=str(date.today() - timedelta(days=1)))
+        self.price_list.write_text(json.dumps(expired), encoding="utf-8")
         self.write(self.agent_file("a1"), [turn("req-1", out=42)])
         self.assertEqual(0, self.start("--new-agent")[0])
         result = self.finish()[1]
@@ -416,9 +475,9 @@ class HonestGapTests(Fixture):
         self.assertEqual("unavailable", result["cost_status"])
         self.assertIn("expired", result["cost_reason"])
 
-    def test_absent_tariff_yields_tokens_without_cost(self):
+    def test_absent_price_list_yields_tokens_without_cost(self):
         self.write(self.agent_file("a1"), [turn("req-1", out=42)])
-        self.assertEqual(0, self.start("--new-agent", tariff=False)[0])
+        self.assertEqual(0, self.start("--new-agent", price_list=False)[0])
         result = self.finish()[1]
         self.assertEqual(42, result["tokens"]["output"])
         self.assertEqual("unavailable", result["cost_status"])
@@ -470,7 +529,7 @@ class HonestGapTests(Fixture):
     def test_main_scope_falls_back_to_the_session_environment_variable(self):
         self.write(self.session_file(), [turn("req-main", sidechain=False, out=3)])
         with patch.dict(os.environ, {"CLAUDE_CODE_SESSION_ID": self.session}):
-            self.assertEqual(0, self._main_start("--new-agent", "--tariff", str(self.tariff))[0])
+            self.assertEqual(0, self._main_start("--new-agent", "--price-list", str(self.price_list))[0])
         result = self.call("finish", "--run", "run-1", "--task", "M001", "--outcome", "accepted")[1]
         self.assertEqual(3, result["tokens"]["output"])
 
@@ -527,7 +586,7 @@ class TeammateDiscoveryTests(Fixture):
 
 
 class ReportTests(Fixture):
-    def test_report_groups_by_served_model_effort_and_tariff(self):
+    def test_report_groups_by_served_model_effort_and_price_list(self):
         self.write(self.agent_file("a1"), [turn("req-1", out=10)])
         self.write(self.agent_file("a2"), [turn("req-2", effort="xhigh", out=20)])
         for task, agent in (("T001", "a1"), ("T002", "a2")):
@@ -539,7 +598,7 @@ class ReportTests(Fixture):
         self.assertEqual(["medium", "xhigh"], efforts)
         for group in result["groups"]:
             self.assertEqual("test-model", group["model"])
-            self.assertEqual("test-rates-1", group["tariff_version"])
+            self.assertEqual("test-rates-1", group["price_list_version"])
             self.assertEqual(1, group["accepted"])
             self.assertEqual({"known": 1, "unknown": 0}, group["cost_coverage"])
 
@@ -555,15 +614,43 @@ class ReportTests(Fixture):
         self.assertEqual({"known": 0, "unknown": 1}, coverage["unknown"])
 
 
-class TariffValidationTests(Fixture):
-    def test_malformed_tariff_is_rejected_at_start(self):
-        for content in ("{", json.dumps({"models": {}}), json.dumps(dict(TARIFF, valid_until="soon"))):
+class PriceListValidationTests(Fixture):
+    def test_malformed_price_list_is_rejected_at_start(self):
+        for content in ("{", json.dumps({"models": {}}), json.dumps(dict(PRICE_LIST, valid_until="soon"))):
             with self.subTest(content=content):
-                self.tariff.write_text(content, encoding="utf-8")
+                self.price_list.write_text(content, encoding="utf-8")
                 code, _, error = self.start("--new-agent", task=f"T{hash(content) % 999:03d}")
                 self.assertEqual(1, code)
-                self.assertIn("tariff", error["error"])
+                self.assertIn("price list", error["error"])
 
+
+
+class RenamedPriceListTests(Fixture):
+    """The price list was once called the tariff; older callers and ledgers must keep working."""
+
+    def test_the_legacy_tariff_flag_is_still_accepted(self):
+        self.write(self.agent_file("a1"), [turn("req-1", inp=100, out=20)])
+        self.assertEqual(0, self.start("--new-agent", "--tariff", str(self.price_list), price_list=False)[0])
+        result = self.finish()[1]
+        self.assertEqual("known", result["cost_status"])
+        self.assertEqual("test-rates-1", result["price_list_version"])
+
+    def test_a_ledger_written_before_the_rename_is_migrated(self):
+        with closing(sqlite3.connect(self.db)) as db, db:
+            db.executescript(usage.SCHEMA.replace("price_list_json", "tariff_json"))
+            db.execute(
+                """INSERT INTO tasks(run_id, task_id, project_tag, role, requested_model, requested_effort,
+                       mode, difficulty, scope, agent_id, started_at, status, baseline_json, tariff_json,
+                       cost_assumptions, cost_status, cost_usd)
+                   VALUES('run-1','T000','proj','r','m','medium','implement','routine','agent','old',
+                          '2026-01-01T00:00:00+00:00','finished','{}',?,'x','known',0.5)""",
+                (json.dumps({"version": "old-rates"}),),
+            )
+        report = self.call("report", "--run", "run-1")[1]
+        self.assertEqual(["old-rates"], [group["price_list_version"] for group in report["groups"]])
+        self.write(self.agent_file("a1"), [turn("req-1", inp=100, out=20)])
+        self.assertEqual(0, self.start("--new-agent")[0])
+        self.assertEqual("known", self.finish()[1]["cost_status"])
 
 if __name__ == "__main__":
     unittest.main()

@@ -43,13 +43,13 @@ development, see the symlink instructions for
 Changes to routing must preserve explicit model and effort choices, evidence-backed
 escalation, acceptance checks, and honest unavailable usage. Changing a role's model or
 effort means updating that host's role file, its routing table in `SKILL.md`, and its
-tariff together; the packaged tests check that those agree. Add regression tests for
+price list together; the packaged tests check that those agree. Add regression tests for
 consequential behavior changes. Document user-visible flags and compatibility changes in
 the same pull request. Never commit session transcripts, credentials, usage databases,
 project scratch files, or private configuration backups.
 
-Prices and model identifiers are facts, not estimates. When updating a tariff, cite the
-official pricing page you read, change the tariff `version`, and leave historical ledger
+Prices and model identifiers are facts, not estimates. When updating a price list, cite the
+official pricing page you read, change the price list `version`, and leave historical ledger
 snapshots alone.
 
 PRs should explain the problem, the resulting behavior, the checks run, and the

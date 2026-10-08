@@ -1,6 +1,6 @@
 {
   "name": "rightsize-goal",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "description": "Cost-aware goal workflow for Codex.",
   "author": {
     "name": "Eric Burns"

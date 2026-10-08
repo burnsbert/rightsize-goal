@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.1.7 — 2026-10-08
+
+### Claude Code
+
+- The junior role now runs on Claude Haiku 5.5. Its `haiku` alias already resolves to
+  `claude-haiku-5-5`, which the price list did not include, so junior workers' cost came back
+  `unavailable`. The price list now covers Haiku 5.5 with both of its published rate cards:
+  $0.10 input and $0.50 output per million tokens for prompts up to 100,000 tokens, and five
+  times that above. It maps the junior role to Haiku 5.5 and keeps Haiku 4.5 for older
+  transcripts. Each request is priced on the card that its own prompt size selects. The pricing
+  page does not say whether cached tokens count toward the threshold; the helper assumes they
+  do. `finish` reports how many requests used the higher card as `long_prompt_requests`.
+- Correct Sonnet 5.5 cache reads to $0.10 per million tokens (was $0.20). All rates were
+  rechecked against the official pricing page on October 8; the price list is valid through
+  November 8.
+- `finish`, `report`, and the goal log now return a `cost_caveat` with every dollar figure, and
+  the coordinator states it whenever it shows a price: a rough estimate at Claude API list
+  prices, not what a Claude subscription costs, and not an exact figure.
+- The docs now describe Haiku 5.5. The role pins no effort, so it runs at Haiku 5.5's default,
+  `medium`. Its window is 1M tokens, and its price rises fivefold above 100,000 prompt tokens.
+  The price spread across the ladder is now about a hundredfold, almost all of it between Haiku
+  and Sonnet.
+
+### Codex and Claude Code
+
+- The bundled `tariff.json` is now `price-list.json`, and the helper's `--tariff` flag is now
+  `--price-list`; `--tariff` is still accepted. Output fields are renamed to
+  `price_list_version` (and `price_list_versions` in Codex chain groups). Existing ledgers are
+  migrated in place the first time the new helper opens them, after which older helper
+  versions cannot read them.
+- Bump both plugins to 1.1.7. Start a fresh session after updating.
+
 ## 1.1.6 — 2026-09-30
 
 ### Codex and Claude Code

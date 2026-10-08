@@ -47,8 +47,8 @@ class PackageTests(unittest.TestCase):
         self.assertFalse((PACKAGE / ".claude-plugin/agents").exists())
         self.assertFalse((PACKAGE / ".claude-plugin/skills").exists())
 
-    def test_agent_payloads_match_tariff_and_skill(self):
-        tariff = json.loads((SKILL / "references/tariff.json").read_text(encoding="utf-8"))
+    def test_agent_payloads_match_price_list_and_skill(self):
+        price_list = json.loads((SKILL / "references/price-list.json").read_text(encoding="utf-8"))
         instructions = (SKILL / "SKILL.md").read_text(encoding="utf-8")
         roles = sorted((PACKAGE / "agents").glob("*.md"))
         self.assertEqual(sorted(f"{name}.md" for name in installer.ROLES),
@@ -64,8 +64,8 @@ class PackageTests(unittest.TestCase):
                 if "effort" in fields:
                     self.assertIn(fields["effort"], EFFORTS)
                 # Every role's model alias must resolve to a priced model.
-                priced = tariff["role_models"][fields["name"]]
-                self.assertIn(priced, tariff["models"])
+                priced = price_list["role_models"][fields["name"]]
+                self.assertIn(priced, price_list["models"])
 
     def test_stop_hook_runs_the_shipped_drive_script_from_the_plugin_root(self):
         hooks = json.loads((PACKAGE / "hooks/hooks.json").read_text(encoding="utf-8"))
@@ -112,9 +112,9 @@ class PackageTests(unittest.TestCase):
                 # Every role can research online.
                 self.assertTrue({"WebFetch", "WebSearch"} <= granted)
 
-    def test_every_tariff_rate_category_is_priced_for_every_model(self):
-        tariff = json.loads((SKILL / "references/tariff.json").read_text(encoding="utf-8"))
-        for model, rates in tariff["models"].items():
+    def test_every_price_list_rate_category_is_priced_for_every_model(self):
+        price_list = json.loads((SKILL / "references/price-list.json").read_text(encoding="utf-8"))
+        for model, rates in price_list["models"].items():
             with self.subTest(model=model):
                 for field in ("input", "cache_read", "cache_write_5m", "cache_write_1h", "output"):
                     self.assertIsInstance(rates[field], (int, float))
@@ -122,6 +122,18 @@ class PackageTests(unittest.TestCase):
                 # The worker lifecycle rule (30% of the window free) needs every model's window.
                 self.assertIsInstance(rates["context_window"], int)
                 self.assertGreater(rates["context_window"], 0)
+                # A second rate card for long prompts must be complete and cost more.
+                if "long_prompt" in rates:
+                    card = rates["long_prompt"]
+                    self.assertIsInstance(card["over_tokens"], int)
+                    self.assertGreater(card["over_tokens"], 0)
+                    for field in ("input", "cache_read", "cache_write_5m", "cache_write_1h", "output"):
+                        self.assertGreater(card[field], rates[field])
+
+    def test_haiku_5_5_has_both_published_rate_cards(self):
+        price_list = json.loads((SKILL / "references/price-list.json").read_text(encoding="utf-8"))
+        self.assertEqual("claude-haiku-5-5", price_list["role_models"]["rightsize-junior-doer"])
+        self.assertEqual(100_000, price_list["models"]["claude-haiku-5-5"]["long_prompt"]["over_tokens"])
 
     def test_documentation_relative_links_exist(self):
         files = list(REPO.glob("*.md")) + list(PACKAGE.rglob("*.md"))

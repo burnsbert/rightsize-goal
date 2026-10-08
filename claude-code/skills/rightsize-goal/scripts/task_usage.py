@@ -32,9 +32,15 @@ OUTCOMES = ("accepted", "rework", "unresolved", "cancelled", "failed")
 TOKEN_FIELDS = ("input", "cache_read", "cache_write_5m", "cache_write_1h", "output")
 RATE_FIELDS = TOKEN_FIELDS
 ASSUMPTIONS = (
-    "standard-rate API-equivalent baseline; excludes batch, fast mode, priority tier, "
-    "long-context and service-tier modifiers, server tool fees, taxes, and plan billing "
-    "adjustments; not an actual invoice"
+    "standard-rate API-equivalent baseline; a request whose prompt, counting cache reads and "
+    "writes, exceeds a model's long-prompt threshold is priced at that model's higher rate card; "
+    "excludes batch, fast mode, priority tier, service-tier modifiers, server tool fees, taxes, "
+    "and plan billing adjustments; not an actual invoice"
+)
+# Accompanies every dollar figure so it is never read as a bill.
+COST_CAVEAT = (
+    "rough estimate at Claude API list prices, not what a Claude subscription costs, "
+    "and not an exact figure"
 )
 # A single session can legitimately contain thousands of requests. Beyond this the
 # baseline is refused rather than silently truncated into a wrong subtraction.
@@ -265,14 +271,20 @@ def _record_tokens(usage: dict[str, Any]) -> dict[str, int] | None:
     return tokens
 
 
-def read_usage(path: Path, *, skip_sidechain: bool, exclude: frozenset[str] = frozenset()) -> dict[str, Any]:
+def read_usage(path: Path, *, skip_sidechain: bool, exclude: frozenset[str] = frozenset(),
+               long_prompt_over: dict[str, int] | None = None) -> dict[str, Any]:
     """Sum usage in one transcript, grouped by actual model and actual effort.
 
     ``exclude`` holds request keys captured as a baseline, so a reused agent's
     follow-up assignment is measured on its own rather than from the start.
+    ``long_prompt_over`` maps a model to the prompt size above which a request is
+    priced on its higher rate card; such requests are also summed separately.
     """
+    long_prompt_over = long_prompt_over or {}
     by_model: dict[str, dict[str, int]] = defaultdict(_zero_tokens)
     by_effort: dict[str, dict[str, int]] = defaultdict(_zero_tokens)
+    long_by_model: dict[str, dict[str, int]] = defaultdict(_zero_tokens)
+    long_requests = 0
     seen: set[str] = set()
     counted = 0
     context = None
@@ -300,6 +312,12 @@ def read_usage(path: Path, *, skip_sidechain: bool, exclude: frozenset[str] = fr
         counted += 1
         # Every request carries the worker's whole context, so the latest one measures it.
         current = tokens["input"] + tokens["cache_read"] + tokens["cache_write_5m"] + tokens["cache_write_1h"]
+        # The published price list does not say whether cached tokens count toward the
+        # long-prompt threshold; counting them is the assumption stated in ASSUMPTIONS.
+        if model in long_prompt_over and current > long_prompt_over[model]:
+            long_requests += 1
+            for name, value in tokens.items():
+                long_by_model[model][name] += value
         # Interrupted or failed requests leave a zero-usage "<synthetic>" placeholder; it says
         # nothing about the worker's context, so only real requests measure it.
         if model != "<synthetic>" and current > 0:
@@ -311,6 +329,8 @@ def read_usage(path: Path, *, skip_sidechain: bool, exclude: frozenset[str] = fr
         "status": "available",
         "models": {key: value for key, value in by_model.items() if any(value.values())},
         "efforts": {key: value for key, value in by_effort.items() if any(value.values())},
+        "long_prompt_models": dict(long_by_model),
+        "long_prompt_requests": long_requests,
         "requests": counted,
         "context_tokens": context,
         "context_at_start": first_context,
@@ -370,46 +390,76 @@ def read_keys(path: Path | None, *, skip_sidechain: bool) -> dict[str, Any]:
 # ------------------------------------------------------------------------- cost
 
 
-def _load_tariff(path: Path | None) -> dict[str, Any] | None:
+def _load_price_list(path: Path | None) -> dict[str, Any] | None:
     if path is None:
         return None
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise UsageError(f"cannot read tariff JSON: {exc}") from exc
+        raise UsageError(f"cannot read price list JSON: {exc}") from exc
     if not isinstance(raw, dict) or not isinstance(raw.get("models"), dict):
-        raise UsageError("tariff JSON must contain a models object")
+        raise UsageError("price list JSON must contain a models object")
     for field in ("version", "verified_on", "valid_until"):
         if not isinstance(raw.get(field), str) or not raw[field]:
-            raise UsageError(f"tariff JSON must contain string field {field}")
+            raise UsageError(f"price list JSON must contain string field {field}")
     try:
         valid = datetime.fromisoformat(raw["valid_until"]).date() >= datetime.now().astimezone().date()
     except ValueError as exc:
-        raise UsageError("tariff valid_until must be an ISO date") from exc
+        raise UsageError("price list valid_until must be an ISO date") from exc
     raw["_valid_at_start"] = valid
     if not valid:
-        raw["_validity_reason"] = f"tariff expired on {raw['valid_until']} before the assignment started"
+        raw["_validity_reason"] = f"price list expired on {raw['valid_until']} before the assignment started"
     return raw
 
 
-def _cost(models: dict[str, dict[str, int]], tariff: dict[str, Any] | None) -> tuple[str, float | None, str | None]:
-    if tariff is None:
-        return "unavailable", None, "no tariff snapshot supplied at start"
-    if tariff.get("_valid_at_start") is False:
-        return "unavailable", None, str(tariff.get("_validity_reason", "tariff was not valid at start"))
+def _long_prompt_thresholds(price_list: dict[str, Any] | None) -> dict[str, int]:
+    """Each model's long-prompt threshold, for models whose rate card has a valid one."""
+    thresholds = {}
+    for model, rates in ((price_list or {}).get("models") or {}).items():
+        card = rates.get("long_prompt") if isinstance(rates, dict) else None
+        over = card.get("over_tokens") if isinstance(card, dict) else None
+        if isinstance(over, int) and not isinstance(over, bool) and over > 0:
+            thresholds[model] = over
+    return thresholds
+
+
+def _rate(rates: Any, field: str, label: str) -> tuple[float | None, str | None]:
+    try:
+        rate = float(rates[field])
+    except (KeyError, TypeError, ValueError):
+        return None, f"{label} is missing a valid {field} rate"
+    if not math.isfinite(rate) or rate < 0:
+        return None, f"{label} has an invalid {field} rate"
+    return rate, None
+
+
+def _cost(models: dict[str, dict[str, int]], price_list: dict[str, Any] | None,
+          long_models: dict[str, dict[str, int]] | None = None) -> tuple[str, float | None, str | None]:
+    """Price each model's tokens; tokens from long-prompt requests use that model's higher card."""
+    if price_list is None:
+        return "unavailable", None, "no price list snapshot supplied at start"
+    if price_list.get("_valid_at_start") is False:
+        return "unavailable", None, str(price_list.get("_validity_reason", "price list was not valid at start"))
+    long_models = long_models or {}
     total = 0.0
     for model, tokens in models.items():
-        rates = tariff.get("models", {}).get(model)
+        rates = price_list.get("models", {}).get(model)
         if not isinstance(rates, dict):
-            return "unavailable", None, f"no exact tariff entry for served model {model}"
+            return "unavailable", None, f"no exact price list entry for served model {model}"
+        card = rates.get("long_prompt")
+        if card is not None and model not in _long_prompt_thresholds(price_list):
+            return "unavailable", None, f"price list for {model} has an invalid long_prompt over_tokens threshold"
+        long = long_models.get(model, _zero_tokens())
         for field in RATE_FIELDS:
-            try:
-                rate = float(rates[field])
-            except (KeyError, TypeError, ValueError):
-                return "unavailable", None, f"tariff for {model} is missing a valid {field} rate"
-            if not math.isfinite(rate) or rate < 0:
-                return "unavailable", None, f"tariff for {model} has an invalid {field} rate"
-            total += tokens[field] * rate / 1_000_000
+            rate, problem = _rate(rates, field, f"price list for {model}")
+            if problem:
+                return "unavailable", None, problem
+            total += (tokens[field] - long[field]) * rate / 1_000_000
+            if card is not None:
+                long_rate, problem = _rate(card, field, f"price list for {model} long_prompt card")
+                if problem:
+                    return "unavailable", None, problem
+                total += long[field] * long_rate / 1_000_000
     return "known", total, None
 
 
@@ -445,7 +495,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   tokens_json TEXT,
   actual_models_json TEXT,
   actual_efforts_json TEXT,
-  tariff_json TEXT,
+  price_list_json TEXT,
   cost_status TEXT,
   cost_reason TEXT,
   cost_usd REAL,
@@ -463,6 +513,10 @@ def _connect(path: Path) -> sqlite3.Connection:
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
     connection.executescript(SCHEMA)
+    # The price list was once called the tariff; carry older ledgers forward.
+    columns = {row[1] for row in connection.execute("PRAGMA table_info(tasks)")}
+    if "tariff_json" in columns and "price_list_json" not in columns:
+        connection.execute("ALTER TABLE tasks RENAME COLUMN tariff_json TO price_list_json")
     return connection
 
 
@@ -497,13 +551,13 @@ def start(args: argparse.Namespace) -> dict[str, Any]:
         baseline = {"status": "available", "keys": [], "basis": "explicit_new_agent_zero"}
     else:
         baseline = read_keys(path, skip_sidechain=skip_sidechain)
-    tariff = _load_tariff(args.tariff)
+    price_list = _load_price_list(args.price_list)
     with closing(_connect(args.db)) as db, db:
         try:
             db.execute(
                 """INSERT INTO tasks(run_id, task_id, project_tag, domain, role, requested_model,
                        requested_effort, mode, difficulty, scope, agent_id, transcript_path, prior_task,
-                       started_at, started_at_display, status, baseline_json, tariff_json, cost_assumptions)
+                       started_at, started_at_display, status, baseline_json, price_list_json, cost_assumptions)
                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     args.run, args.task, args.project_tag, args.domain, args.role, args.model,
@@ -511,7 +565,7 @@ def start(args: argparse.Namespace) -> dict[str, Any]:
                     agent_key, str(path) if path else None, args.prior_task,
                     _now(), _display_now(), "active",
                     json.dumps(baseline, sort_keys=True),
-                    json.dumps(tariff, sort_keys=True) if tariff else None,
+                    json.dumps(price_list, sort_keys=True) if price_list else None,
                     ASSUMPTIONS,
                 ),
             )
@@ -537,7 +591,7 @@ def start(args: argparse.Namespace) -> dict[str, Any]:
         "baseline_status": baseline["status"],
         "baseline_requests": len(baseline.get("keys", [])),
         "transcript_path": str(path) if path else None,
-        "tariff_version": tariff.get("version") if tariff else None,
+        "price_list_version": price_list.get("version") if price_list else None,
         "finish_before_reusing_agent": True,
     }
 
@@ -557,12 +611,14 @@ def finish(args: argparse.Namespace) -> dict[str, Any]:
                 "usage_reason": row["usage_reason"], "cost_status": row["cost_status"],
                 "cost_reason": row["cost_reason"], "cost_usd": row["cost_usd"],
                 "tokens": json.loads(row["tokens_json"]) if row["tokens_json"] else None,
-                "tariff_version": json.loads(row["tariff_json"]).get("version") if row["tariff_json"] else None,
-                "cost_assumptions": row["cost_assumptions"], "recorded_at": row["finished_at_display"],
+                "price_list_version": json.loads(row["price_list_json"]).get("version") if row["price_list_json"] else None,
+                "cost_assumptions": row["cost_assumptions"], "cost_caveat": COST_CAVEAT,
+                "recorded_at": row["finished_at_display"],
             }
 
         skip_sidechain = row["scope"] == "main"
         baseline = json.loads(row["baseline_json"])
+        price_list = json.loads(row["price_list_json"]) if row["price_list_json"] else None
         path: Path | None = None
         usage: dict[str, Any]
         try:
@@ -580,7 +636,8 @@ def finish(args: argparse.Namespace) -> dict[str, Any]:
                 usage = {"status": "unavailable", "reason": "start baseline was unavailable"}
             else:
                 usage = read_usage(
-                    path, skip_sidechain=skip_sidechain, exclude=frozenset(baseline.get("keys", []))
+                    path, skip_sidechain=skip_sidechain, exclude=frozenset(baseline.get("keys", [])),
+                    long_prompt_over=_long_prompt_thresholds(price_list),
                 )
         except UsageError as exc:
             usage = {"status": "unavailable", "reason": str(exc)}
@@ -589,16 +646,15 @@ def finish(args: argparse.Namespace) -> dict[str, Any]:
         efforts = usage.get("efforts", {}) if usage["status"] == "available" else {}
         usage_reason = usage.get("reason")
         if usage["status"] == "available":
-            cost_status, cost_usd, cost_reason = _cost(
-                models, json.loads(row["tariff_json"]) if row["tariff_json"] else None
-            )
+            cost_status, cost_usd, cost_reason = _cost(models, price_list, usage.get("long_prompt_models"))
             totals = {name: sum(values[name] for values in models.values()) for name in TOKEN_FIELDS}
             totals["total_input"] = totals["input"] + totals["cache_read"] + totals["cache_write_5m"] + totals["cache_write_1h"]
             totals["total_tokens"] = totals["total_input"] + totals["output"]
             totals["requests"] = int(usage.get("requests", 0))
+            totals["long_prompt_requests"] = int(usage.get("long_prompt_requests", 0))
         else:
             cost_status, cost_usd, cost_reason, totals = "unavailable", None, usage_reason, None
-        facts = _context_facts(usage, json.loads(row["tariff_json"]) if row["tariff_json"] else None)
+        facts = _context_facts(usage, price_list)
 
         db.execute(
             """UPDATE tasks SET finished_at=?, finished_at_display=?, status='finished', outcome=?,
@@ -614,21 +670,21 @@ def finish(args: argparse.Namespace) -> dict[str, Any]:
                 cost_status, cost_reason, cost_usd, args.run, args.task,
             ),
         )
-        tariff_version = json.loads(row["tariff_json"]).get("version") if row["tariff_json"] else None
+        price_list_version = price_list.get("version") if price_list else None
         _append_goal_event(args.db, args.run, {"event": "agent_result", "goal_id": args.run,
             "task_id": args.task, "at": _now(), "agent": row["role"], "agent_id": row["agent_id"],
             "outcome": args.outcome, "evidence": args.evidence, "lesson": args.lesson,
             "tokens": totals, "usage_status": usage["status"], "usage_reason": usage_reason,
             "estimated_cost_usd": cost_usd, "cost_status": cost_status,
-            "cost_reason": cost_reason, "tariff_version": tariff_version,
+            "cost_reason": cost_reason, "cost_caveat": COST_CAVEAT, "price_list_version": price_list_version,
             "actual_models": sorted(models), "actual_efforts": sorted(efforts), **facts})
 
     result = {
         "command": "finish", "run": args.run, "task": args.task, "status": "finished",
         "idempotent": False, "outcome": args.outcome, "usage_status": usage["status"],
         "tokens": totals, "actual_models": sorted(models), "actual_efforts": sorted(efforts),
-        "cost_status": cost_status, "cost_usd": cost_usd, "tariff_version": tariff_version,
-        "cost_assumptions": ASSUMPTIONS, "recorded_at": _display_now(),
+        "cost_status": cost_status, "cost_usd": cost_usd, "price_list_version": price_list_version,
+        "cost_assumptions": ASSUMPTIONS, "cost_caveat": COST_CAVEAT, "recorded_at": _display_now(),
     }
     if usage_reason:
         result["usage_reason"] = usage_reason
@@ -641,7 +697,7 @@ def finish(args: argparse.Namespace) -> dict[str, Any]:
     return result
 
 
-def _context_facts(usage: dict[str, Any], tariff: dict[str, Any] | None) -> dict[str, Any]:
+def _context_facts(usage: dict[str, Any], price_list: dict[str, Any] | None) -> dict[str, Any]:
     """The worker's context size against its model's window, and whether it can take more work."""
     empty = {"context_tokens": None, "context_window": None, "context_free_pct": None, "eligible": None,
              "compacted": None, "assignment_growth_tokens": None, "oversized": None}
@@ -651,7 +707,7 @@ def _context_facts(usage: dict[str, Any], tariff: dict[str, Any] | None) -> dict
     start = usage.get("context_at_start")
     growth = tokens - start if start is not None else None
     compacted = bool(usage.get("compacted"))
-    rates = (tariff or {}).get("models", {}).get(usage.get("last_model") or "", {})
+    rates = (price_list or {}).get("models", {}).get(usage.get("last_model") or "", {})
     window = rates.get("context_window") if isinstance(rates, dict) else None
     window = window if isinstance(window, int) and not isinstance(window, bool) and window > 0 else None
     exact_free = (window - tokens) / window if window else None
@@ -776,12 +832,12 @@ def report(args: argparse.Namespace) -> dict[str, Any]:
 
     groups: dict[tuple[str, ...], list[sqlite3.Row]] = defaultdict(list)
     for row in rows:
-        tariff_version = "none"
-        if row["tariff_json"]:
-            tariff_version = str(json.loads(row["tariff_json"]).get("version", "unversioned"))
+        price_list_version = "none"
+        if row["price_list_json"]:
+            price_list_version = str(json.loads(row["price_list_json"]).get("version", "unversioned"))
         key = (
             _observed(row["actual_models_json"]), _observed(row["actual_efforts_json"]),
-            row["mode"], row["difficulty"], tariff_version,
+            row["mode"], row["difficulty"], price_list_version,
         )
         groups[key].append(row)
 
@@ -808,7 +864,7 @@ def report(args: argparse.Namespace) -> dict[str, Any]:
             token_sums["total_tokens"] = sum(token_sums[name] for name in TOKEN_FIELDS)
         output.append({
             "model": key[0], "effort": key[1], "mode": key[2], "difficulty": key[3],
-            "tariff_version": key[4], "samples": len(items),
+            "price_list_version": key[4], "samples": len(items),
             "active": sum(item["status"] == "active" for item in items),
             "roles": sorted({item["role"] for item in items}),
             "accepted": outcomes["accepted"], "rework": outcomes["rework"],
@@ -823,7 +879,7 @@ def report(args: argparse.Namespace) -> dict[str, Any]:
             "lessons": [entry for _, entry in sorted(lessons, key=lambda pair: pair[0])[-5:]],
         })
     return {"command": "report", "run": args.run, "samples": len(rows), "groups": output,
-            "cost_assumptions": ASSUMPTIONS}
+            "cost_assumptions": ASSUMPTIONS, "cost_caveat": COST_CAVEAT}
 
 
 # --------------------------------------------------------------------------- cli
@@ -858,7 +914,8 @@ def _parser() -> argparse.ArgumentParser:
     begin.add_argument("--transcript", type=Path, help="explicit transcript path, bypassing discovery")
     begin.add_argument("--new-agent", action="store_true",
                        help="force a zero baseline for a freshly spawned agent")
-    begin.add_argument("--tariff", type=Path, help="tariff JSON snapshot to store with this assignment")
+    begin.add_argument("--price-list", "--tariff", dest="price_list", type=Path,
+                       help="price list JSON snapshot to store with this assignment (--tariff is the legacy name)")
     begin.add_argument("--prior-task", help="task ID this one reworks, continues, or escalates from")
     begin.add_argument("--reason", help="why this call is needed, especially after an insufficient result")
     begin.add_argument("--domain", help="short, nonsensitive task-domain label")

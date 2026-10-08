@@ -68,8 +68,8 @@ class PackageTests(unittest.TestCase):
                                         text=True, capture_output=True, timeout=30)
                 self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
-    def test_agent_payloads_match_tariff_and_skill(self):
-        tariff = json.loads((SKILL / "references/tariff.json").read_text(encoding="utf-8"))
+    def test_agent_payloads_match_price_list_and_skill(self):
+        price_list = json.loads((SKILL / "references/price-list.json").read_text(encoding="utf-8"))
         instructions = (SKILL / "SKILL.md").read_text(encoding="utf-8")
         roles = list((PACKAGE / ".codex/agents").glob("*.toml"))
         self.assertEqual(5, len(roles))
@@ -82,7 +82,7 @@ class PackageTests(unittest.TestCase):
                 self.assertEqual(path.stem, agent["name"])
                 self.assertTrue(agent["description"].strip())
                 self.assertTrue(agent["developer_instructions"].strip())
-                self.assertIn(agent["model"], tariff["models"])
+                self.assertIn(agent["model"], price_list["models"])
                 self.assertIn(agent["name"], instructions)
                 self.assertIn(agent["model_reasoning_effort"], {"low", "medium", "high", "xhigh"})
                 # Web search and shell network/filesystem permissions are separate controls.

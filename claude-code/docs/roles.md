@@ -2,8 +2,8 @@
 
 The Codex implementation of Rightsize Goal uses five roles across three models. This
 package originally kept seven worker roles, one lower-effort and one higher-effort variant
-per paid model. It was simplified to four: one role per model, each pinned at the documented
-API default of `high`. A fifth role, the validator, judges completion rather than doing work.
+per paid model. It was simplified to four: one role per model, with the Sonnet, Opus, and Fable roles each
+pinned at `high` and the Haiku junior left at its model's default effort. A fifth role, the validator, judges completion rather than doing work.
 This document records the reasoning so the ladder can be argued with rather than merely
 inherited.
 
@@ -11,7 +11,7 @@ inherited.
 
 | Role | Model | Effort | Task boundary |
 | --- | --- | --- | --- |
-| `rightsize-junior-doer` | Claude Haiku 4.5 | not supported | Explicit, low-risk work with an example or prescribed approach |
+| `rightsize-junior-doer` | Claude Haiku 5.5 | default (`medium`) | Explicit, low-risk work with an example or prescribed approach |
 | `rightsize-midlevel-doer` | Claude Sonnet 5.5 | `high` | Bounded work using established project patterns, including moderately complex work needing more judgment |
 | `rightsize-senior-doer` | Claude Opus 5.5 | `high` | Hard work: ambiguity, unfamiliar integrations, real tradeoffs, deep interacting constraints |
 | `rightsize-principal-doer` | Claude Fable 5.1 | `high` | Break-glass: the hardest unresolved core, only after documented Opus struggle |
@@ -43,17 +43,21 @@ the effects of their fixes, and do not fail the goal for issues an earlier round
 On Claude Code, cost moves along two axes, and the second one matters more here than it
 does on Codex.
 
-**Model.** Published per-million rates put roughly a tenfold spread between the cheapest
-and most expensive model in the ladder. That is a real gap, but it is much flatter than the
-Codex lineup's, and the difference is not evenly distributed. On Codex the step from Luna to
+**Model.** Published per-million rates put about a hundredfold spread between the cheapest
+and most expensive model in the ladder, for prompts up to 100,000 tokens, but almost all of it
+is at the bottom. Haiku 5.5 costs about a twentieth of Sonnet 5.5 per token (about a quarter
+once a prompt passes 100,000 tokens); every step above Sonnet is two to two-and-a-half times.
+On Codex the step from Luna to
 Sol — its midlevel-to-senior boundary — is twentyfold in per-token price, so routing a task
 down a tier there is a decision with large consequences in both directions. The Claude
 equivalent, Sonnet 5.5 to Opus 5.5, is a twofold step. Sonnet 5.5
 is a strong model that handles a great deal of real work, which means the cost of routing it
 wrongly is lower, and so is the saving from routing it downward.
 
-The practical consequence: dropping one model tier saves less than the tier names imply, and
-a single rework cycle can erase it. The ladder is not a licence to route everything downward —
+The practical consequence: above Haiku, dropping one model tier saves less than the tier names
+imply, and a single rework cycle can erase it. Moving work down to Haiku saves a great deal per
+token, but a failed attempt still costs the coordinator's review and a fresh dispatch, so the
+saving is real only for work Haiku gets right the first time. The ladder is not a licence to route everything downward —
 it is a reason to route by task fit and measure the outcome.
 
 **Effort.** Sonnet 5.5, Opus 5.5, and Fable 5.1 accept `low` through `max`, and effort changes
@@ -93,13 +97,13 @@ path; this is a Claude Code limitation with no equivalent in the Codex implement
 Two measured figures from this machine, both from real runs rather than estimates.
 
 A trivial assignment dispatched as a plain in-process subagent — one that does nothing but
-reply — cost about **$0.0095** at the junior role and about **$0.0238** at the midlevel
-role, then running at `medium` effort; this ladder now runs that role at `high`, so expect a
+reply — cost about **$0.0010** at the junior role on Haiku 5.5 (about **$0.0095** on Haiku 4.5)
+and about **$0.0238** at the midlevel role, then running at `medium` effort; this ladder now runs that role at `high`, so expect a
 higher floor. Almost all of that cost is the worker's system prompt billed as cache-write
 tokens. That is the floor price of a dispatch.
 
-The same junior role dispatched as an Agent Teams *teammate*, doing a genuinely trivial two-line
-test addition, cost **$0.0434 across 93,956 tokens and 9 requests**. A teammate is a full session:
+The same junior role on Haiku 4.5, dispatched as an Agent Teams *teammate* doing a genuinely
+trivial two-line test addition, cost **$0.0434 across 93,956 tokens and 9 requests**. A teammate is a full session:
 it loads its own project instructions and orients itself before it reaches your task. Its floor is
 roughly four to five times a subagent's.
 
@@ -116,25 +120,27 @@ project's evidence.
 
 ## Why the junior role is Haiku only
 
-Haiku 4.5 does not accept an effort setting; the field is simply absent from its recorded
-turns. So there is exactly one Haiku tier, not two.
+The junior role was written for Haiku 4.5, which did not accept an effort setting, so the role
+pins only the model. Its `haiku` alias now serves Haiku 5.5, which does accept one. With no pin,
+a plain in-process subagent runs at Haiku 5.5's default, `medium`. There is still one Haiku
+tier, matching the one-role-per-model ladder.
 
-Haiku's band is genuinely narrow, and the role description says so:
+Haiku's band is still narrow, and the role description says so:
 
-- Its context window is smaller than the other three models', so the working set has to
-  stay small.
-- It is a 4.5-generation model in a ladder of 5-generation peers, a wider capability gap
-  than its price gap suggests.
-- It is only about half the per-token price of Sonnet 5.5, so the savings are modest.
+- It is the smallest model in the ladder, so the task has to be explicit, with an example or a
+  prescribed approach.
+- Its price rises fivefold once a request's prompt passes 100,000 tokens, so the working set
+  should stay small even though its window is 1M tokens.
 
-It still earns a place. As the measured figures above show, its dispatch floor is meaningfully
-lower than the midlevel role's. For genuinely mechanical, low-rework work that pays; for
-anything likely to come back for a second attempt it does not.
+The saving is now large: about a twentieth of Sonnet 5.5's per-token price on prompts up to
+100,000 tokens, and a measured dispatch floor under a twentieth of the midlevel figure above. That pays for
+genuinely mechanical, low-rework work. For anything likely to come back for a second attempt,
+the coordinator's review and the fresh dispatch can still cost more than the saving.
 
 ## Why four roles
 
 The package originally shipped seven roles: a `medium`-effort and a `high`-effort variant of
-each paid model (Sonnet 5, Opus 5, Fable 5.1), plus the effort-less Haiku junior. It was
+each paid model (Sonnet 5, Opus 5, Fable 5.1), plus the effort-less Haiku 4.5 junior. It was
 simplified to one role per model, each at `high`, trading away three things:
 
 - **The upper-midlevel tier.** Moderately complex bounded work — multi-file changes,
@@ -202,7 +208,7 @@ The roles are plain Markdown files in `agents/`. To adjust one, edit its `model`
 `effort` frontmatter — but keep three things consistent or the accounting will quietly
 degrade:
 
-1. `references/tariff.json` must contain an entry for the exact model identifier that
+1. `references/price-list.json` must contain an entry for the exact model identifier that
    ends up being served, or every assignment for that role reports an unavailable cost.
    Update `role_models` in the same file so the packaged consistency test still passes.
 2. The role must still appear by name in `SKILL.md`, which is where the coordinator learns

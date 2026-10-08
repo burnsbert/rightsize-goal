@@ -155,7 +155,7 @@ research is read-only unless artifact ownership is assigned, and commits,
 publishing, and external messages require explicit authorization. Those boundaries
 are agent instructions rather than filesystem restrictions.
 
-Each goal has a unique `.rightsize-goal/<goal-id>.jsonl` call/result log in the target project. Task usage and routing history remain in that project's `.rightsize-goal/usage.sqlite3`. The cost figures are standard-rate API-equivalent estimates from a versioned tariff; they are useful for routing comparisons but are not an authoritative subscription bill.
+Each goal has a unique `.rightsize-goal/<goal-id>.jsonl` call/result log in the target project. Task usage and routing history remain in that project's `.rightsize-goal/usage.sqlite3`. The cost figures are standard-rate API-equivalent estimates from a versioned price list; they are useful for routing comparisons but are not an authoritative subscription bill.
 
 See [accounting and local data](docs/accounting.md) for measurement gaps and privacy.
 
@@ -169,7 +169,7 @@ Run all deterministic tests from `codex/`:
 python -m unittest discover -s tests -p "test_*.py"
 ```
 
-The bundled model tariff has a review date. Once it expires, token accounting continues while dollar estimates remain unavailable until `references/tariff.json` is refreshed from the linked official model pages.
+The bundled model price list has a review date. Once it expires, token accounting continues while dollar estimates remain unavailable until `references/price-list.json` is refreshed from the linked official model pages.
 
 See the [contributor guide](../CONTRIBUTING.md) and
 [release checks and validation status](docs/release.md).
