@@ -22,6 +22,8 @@ import tomllib
 
 ROLES = (
     "rightsize-junior-doer",
+    "rightsize-junior-plus-doer",
+    "rightsize-writer",
     "rightsize-midlevel-doer",
     "rightsize-senior-doer",
     "rightsize-staff-doer",

@@ -9,10 +9,10 @@ difficulty at the tier below.
 This repository is organized by host. Each implementation documents its own models, tools,
 installation, and limitations; neither assumes the other's APIs.
 
-- [`claude-code/`](claude-code/) — the Claude Code implementation: a plugin with one skill
+- [`claude-code/`](claude-code/) â€” the Claude Code implementation: a plugin with one skill
   and five subagent roles across Haiku 5.5, Sonnet 5.5, Opus 5.5, and Fable 5.1, including an
   independent validator.
-- [`codex/`](codex/) — the Codex implementation: a skill, five agent roles, and installers.
+- [`codex/`](codex/) â€” the Codex implementation: a skill, seven agent roles, and installers.
 
 ## Claude Code
 
@@ -25,7 +25,7 @@ Run these commands inside Claude Code:
 /plugin install rightsize-goal@rightsize-goal
 ```
 
-To receive updates, enable auto-update for the `rightsize-goal` marketplace under `/plugin` →
+To receive updates, enable auto-update for the `rightsize-goal` marketplace under `/plugin` â†’
 **Marketplaces**, or run `claude plugin update rightsize-goal` from a terminal.
 
 ### Use
@@ -55,7 +55,7 @@ roles](claude-code/docs/roles.md) explains the tier boundaries.
 
 ### Install
 
-For the complete skill and five-agent workflow:
+For the complete skill and seven-agent workflow:
 
 ```sh
 git clone https://github.com/burnsbert/rightsize-goal.git
@@ -67,7 +67,7 @@ sh codex/install.sh && sh codex/install.sh --verify
 
 Open Codex in the project you want to change. Select `gpt-6.1-sol` with medium
 reasoning for the coordinator when available, and select full access before
-delegating. All five workers default to full access and live web research; the
+delegating. All seven workers default to full access and live web research; the
 parent session's active permission settings can override their defaults.
 See the [Codex permission setup](codex/README.md#run), then ask:
 
@@ -96,7 +96,7 @@ stays local.
 
 Savings are task-dependent. The workflow does not guarantee uninterrupted execution or a
 spending cap, and it is not a host-level watchdog. Dollar figures are standard-rate
-API-equivalent estimates for comparing routing choices, not bills — a Claude Code
+API-equivalent estimates for comparing routing choices, not bills â€” a Claude Code
 subscription is not billed per token at all.
 
 Released under the [MIT License](LICENSE), copyright 2026 Eric Burns. See

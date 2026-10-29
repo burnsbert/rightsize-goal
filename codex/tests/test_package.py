@@ -72,14 +72,25 @@ class PackageTests(unittest.TestCase):
         price_list = json.loads((SKILL / "references/price-list.json").read_text(encoding="utf-8"))
         instructions = (SKILL / "SKILL.md").read_text(encoding="utf-8")
         roles = list((PACKAGE / ".codex/agents").glob("*.toml"))
-        self.assertEqual(5, len(roles))
-        self.assertEqual({"rightsize-junior-doer", "rightsize-midlevel-doer",
+        self.assertEqual(7, len(roles))
+        expected_models = {
+            "rightsize-junior-doer": ("gpt-6-luna", "high"),
+            "rightsize-junior-plus-doer": ("gpt-6-luna", "xhigh"),
+            "rightsize-midlevel-doer": ("gpt-6.1-terra", "high"),
+            "rightsize-writer": ("gpt-6.1-terra", "medium"),
+            "rightsize-senior-doer": ("gpt-6.1-sol", "medium"),
+            "rightsize-staff-doer": ("gpt-6.1-sol", "high"),
+            "rightsize-principal-doer": ("gpt-6-astra", "medium"),
+        }
+        self.assertEqual({"rightsize-junior-doer", "rightsize-junior-plus-doer", "rightsize-writer", "rightsize-midlevel-doer",
                           "rightsize-senior-doer", "rightsize-staff-doer",
                           "rightsize-principal-doer"}, {path.stem for path in roles})
         for path in roles:
             with self.subTest(role=path.name):
                 agent = tomllib.loads(path.read_text(encoding="utf-8"))
                 self.assertEqual(path.stem, agent["name"])
+                self.assertEqual(expected_models[path.stem],
+                                 (agent["model"], agent["model_reasoning_effort"]))
                 self.assertTrue(agent["description"].strip())
                 self.assertTrue(agent["developer_instructions"].strip())
                 self.assertIn(agent["model"], price_list["models"])

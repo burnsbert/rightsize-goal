@@ -6,22 +6,22 @@ and records usage and lessons. It seeks lower total cost including rework; savin
 are not guaranteed. For a one-step request, the main thread completes it directly
 without dispatching agents or creating persistent goal state.
 
-This package ships one skill, five custom agents, two standard-library Python
+This package ships one skill, seven custom agents, two standard-library Python
 helpers, and installers. It uses your existing Codex account, with full-access
-permission defaults for all five workers.
+permission defaults for all seven workers.
 
 ## Requirements
 
 - A local Codex host with custom subagents enabled. Native goal tools are required
   for automatic continuation, but current-session work can use saved goal state.
 - Python 3.11 or newer.
-- Access to the model names configured by the five included roles.
+- Access to the model names configured by the seven included roles.
 - For optional symlinks on Windows: Developer Mode or appropriate privileges.
 
 ## Install
 
 For the full workflow, clone the repository and run the installer. It installs
-the Codex skill and all five custom agents:
+the Codex skill and all seven custom agents:
 
 ```powershell
 git clone https://github.com/burnsbert/rightsize-goal.git
@@ -40,7 +40,7 @@ sh codex/install.sh --verify
 ```
 
 The default installation copies the skill to `~/.agents/skills/rightsize-goal`
-and the five agent definitions to `$CODEX_HOME/agents` (normally `~/.codex/agents`).
+and the seven agent definitions to `$CODEX_HOME/agents` (normally `~/.codex/agents`).
 It leaves global configuration unchanged. Older hosts needing explicit registrations
 can opt into `--legacy-config`, which backs up changed configuration first.
 
@@ -73,7 +73,7 @@ After installing or updating, start a fresh Codex session so the skill and custo
 Keep dot-prefixed folders when extracting an archive. Codex users can also add
 this repository as a marketplace and install `rightsize-goal@rightsize-goal`.
 That plugin safely installs the **Codex skill only**. Codex plugins cannot yet
-bundle custom agents, so the five roles still need `codex/install.py` for the
+bundle custom agents, so the seven roles still need `codex/install.py` for the
 full workflow. Use the installer as the supported full install path; avoid
 combining plugin and manual installs of the skill, which creates two copies
 that can drift. See [installation and maintenance](docs/install.md) for the
@@ -112,10 +112,12 @@ The coordinator routes work among:
 | Role | Configuration | Intended scope |
 | --- | --- | --- |
 | Junior | Luna/high | Very basic explicit work and factual research without judgment calls |
-| Lower-midlevel | Luna/xhigh | Routine bounded work and evidence gathering using defined criteria |
+| Junior Plus | Luna/xhigh | Routine bounded work and evidence gathering using defined criteria |
+| Midlevel | Terra 6.1/high | Scoped coding requiring judgment, visual interpretation, defined app workflows |
+| Writer | Terra 6.1/medium | Prose, editing, documentation, UX writing and microcopy |
 | Senior | GPT-6.1 Sol/medium | Moderate to hard implementation, research, and brainstorming |
 | Staff | GPT-6.1 Sol/high | Strongest pre-Astra first pass for the most complex work; deep interacting constraints |
-| Principal | Astra/medium | Bounded expert work after documented Sol struggle |
+| Principal | Astra/medium | Expert work after Sol struggle, or justified direct routing with --astra |
 
 In this workflow, Sol means GPT-6.1 Sol (`gpt-6.1-sol`). The coordinator uses
 medium reasoning, as does the senior; the staff uses high reasoning. OpenAI's
@@ -124,10 +126,20 @@ describes account and client availability; Enterprise and Edu administrators
 must enable the model. After upgrading, start a fresh Codex session to load the
 updated roles.
 
-Known moderate work goes directly to Sol/medium rather than using Luna as a cheap trial.
+Scoped work needing judgment can go directly to Terra/high; known hard or ambiguous
+work goes directly to Sol rather than using a cheaper worker as a speculative trial.
 The most complex work goes directly to Sol/high when Astra escalation is a credible
 risk. Astra has one medium-effort principal engineer role so the escalation receives
-enough reasoning budget without an Astra/low retry.
+enough reasoning budget without an Astra/low retry. By default, Astra requires
+documented Sol struggle. Use `$rightsize-goal --astra <objective>` to allow direct
+expert routing when stronger reasoning is likely to materially improve the result.
+The flag is interpreted by the skill, not the Codex CLI or gate helper. It persists
+as `astra_policy` across resume and does not upgrade routine tasks or the coordinator.
+See [usage and policy examples](docs/usage.md#astra-routing-and-writing).
+
+Terra requires Codex CLI 0.159.0 or later and account access to `gpt-6.1-terra`.
+The Writer's role instructions cover human-centered prose, form-specific editing,
+and UX microcopy, including strong guidance against formulaic AI language.
 
 Every role sets the following defaults for filesystem access, network access
 from commands, and live web research:
@@ -140,7 +152,7 @@ web_search = "live"
 
 The coordinator must also run with full access. This repository's
 [project configuration](../.codex/config.toml) sets these defaults and registers
-the five distributed roles using relative paths. In another trusted project,
+the seven distributed roles using relative paths. In another trusted project,
 merge the three settings above into its `.codex/config.toml` before starting
 Codex. For a one-off CLI session, use
 `codex --sandbox danger-full-access --ask-for-approval never --search`.

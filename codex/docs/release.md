@@ -1,5 +1,17 @@
 # Codex release checks
 
+## 1.2.0 checks: October 29, 2026
+
+All 67 Codex tests pass, including seven-role model/effort assertions and
+installer backup/verification checks. Skill validation and isolated app-server
+discovery pass. The global copy installation and legacy registrations verify
+against this source. Standard rates were rechecked against each linked official
+model page; the price list is valid through November 29.
+
+No live model goal or end-to-end stop/resume smoke test was run. This release
+validates packaging and configuration, not model quality, entitlement, or native
+goal continuation. Claude Code package files and version are unchanged.
+
 ## 1.1.7 checks: October 8, 2026
 
 All 67 Codex tests pass. The two skill copies are identical, and an isolated app-server probe
@@ -114,7 +126,7 @@ error-free behavior.
 - Observe the complete CI matrix passing, including symlink coverage on a host
   that permits symlinks. Exercise the public shell and PowerShell entry points.
 - Install from a clean source archive, including dot-prefixed payload folders.
-- Start a fresh Codex session and confirm the skill and all five named roles load;
+- Start a fresh Codex session and confirm the skill and all seven named roles load;
   confirm retired upper-midlevel, lower-senior, and generic-Astra roles no longer appear
   after upgrade.
 - Run a small goal in a disposable project. Confirm suitable delegation, verified
@@ -129,7 +141,7 @@ error-free behavior.
 - Recheck price list expiry and linked rates. Change the price list version when rates change;
   do not rewrite historical ledger snapshots.
 - Ensure no credentials, local logs, databases, or private backups enter the release.
-- Include the root MIT `LICENSE`, docs, skill helpers/references, and all five roles
+- Include the root MIT `LICENSE`, docs, skill helpers/references, and all seven roles
   in any downloadable bundle. Root source archives already carry these files.
 - Update `CHANGELOG.md`, select a version/tag, and publish only the tested commit.
 
@@ -137,9 +149,18 @@ error-free behavior.
 
 Supported instructions cover clone/copy, extracted source archive/copy,
 contributor symlinks, and a Codex marketplace plugin for the skill alone.
-The five custom agents still require the installer. Uninstall is documented
+The seven custom agents still require the installer. Uninstall is documented
 manual removal. A PyPI/pipx package, remote bootstrap, automated updater, and
 automated uninstaller are not release artifacts in this tree.
 
 Keep this checklist host-specific when adding Claude Code support. Do not make
 claims about Claude Code testing based on Codex results.
+
+## October 29, 2026 routing update
+
+Seven workers now include Terra/high Midlevel, Luna/xhigh Junior Plus, and
+Terra/medium Writer. The --astra policy permits justified direct expert routing
+and persists across resume. Live smoke checks should cover default Sol-first
+escalation, direct --astra dispatch, resume without repeating the flag, and a
+Writer UX assignment. Deterministic tests do not establish model behavior or
+account entitlement. The Claude Code distribution is unchanged.

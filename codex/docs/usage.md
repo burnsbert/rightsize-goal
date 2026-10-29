@@ -5,7 +5,7 @@ any actual limits. Open Codex in the project you want it to work on. Select
 `gpt-6.1-sol` at medium reasoning when available. Other root models are disclosed
 as a mismatch; the skill cannot switch the root model for you.
 
-Select full access for the coordinator before delegating. The five worker roles
+Select full access for the coordinator before delegating. The seven worker roles
 default to `sandbox_mode = "danger-full-access"`, `approval_policy = "never"`,
 and `web_search = "live"`. Configure the target project's parent session using
 the [permission setup](../README.md#run); active parent overrides and managed
@@ -56,6 +56,30 @@ Acceptance: reproduce it, identify the cause, and demonstrate improvement with a
 The duration flags belong to the skill, not Codex's native `/goal` parser. They
 accept a nonnegative number with seconds, minutes, hours, or days, including
 fractions such as `1.5 hours`. Omitted bounds impose no default duration.
+
+## Astra routing and writing
+
+```text
+Use $rightsize-goal --astra to investigate the cross-service consistency bug.
+Acceptance: reproduce it, establish the cause, and verify a fix.
+```
+
+`--astra` permits direct Astra assignments when difficulty makes stronger reasoning
+materially useful. Without it, documented substantive Sol struggle is required.
+Routine work stays on cheaper workers. Every Astra assignment needs a rationale,
+bounded deliverable, acceptance checks, and stop condition. This is a skill flag,
+not a Codex CLI or completion-helper option.
+
+The coordinator saves `astra_policy` as `after-sol` or `benefit-based`. Resume
+retains it even when the flag is omitted. Older states default to after-sol.
+Explicitly ask to return to the default policy to revoke direct routing; the
+coordinator records the change without resetting history or bounds.
+
+The Writer uses Terra 6.1/medium for prose, documentation, and UX microcopy.
+Supply audience, source facts, voice, format constraints, and relevant UI states.
+Its editorial instructions prioritize human readers and reject formulaic AI prose.
+Sol handles difficult underlying research or technical judgments. Writing edits
+use the existing implement accounting mode; editorial assessment uses research.
 
 ## What happens
 

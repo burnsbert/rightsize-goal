@@ -1,6 +1,16 @@
 # Changelog
 
-## 1.1.7 — 2026-10-08
+## 1.2.0 ? 2026-10-29
+
+### Codex
+
+- Add Terra 6.1/high Midlevel and Terra 6.1/medium Writer, with human-centered editorial guidance and UX microcopy instructions. Rename the existing Luna/xhigh role to Junior Plus. Seven workers now supplement the Sol coordinator.
+- Add `--astra` for justified direct expert assignments; persist the routing policy across resume while retaining Sol-first escalation by default.
+- Update installer registrations, mirrored skill payloads, usage and upgrade documentation, and model/effort package checks.
+- Reverify standard API-equivalent rates, add Terra pricing, and extend price-list validity through November 29.
+- Claude Code package and version remain unchanged at 1.1.7.
+
+## 1.1.7 â€” 2026-10-08
 
 ### Claude Code
 
@@ -32,13 +42,13 @@
   versions cannot read them.
 - Bump both plugins to 1.1.7. Start a fresh session after updating.
 
-## 1.1.6 — 2026-09-30
+## 1.1.6 â€” 2026-09-30
 
 ### Codex and Claude Code
 
 - Stage tests that consume substantial tokens or time: run one representative test, inspect its result and usage, then decide whether more or parallel runs are justified. Explicit user direction takes precedence. Cheap tests remain unrestricted.
 
-## 1.1.5 — 2026-09-29
+## 1.1.5 â€” 2026-09-29
 
 ### Codex
 
@@ -53,7 +63,7 @@
   preserve existing ledger snapshots.
 - Bump the Codex plugin to 1.1.5. Start a fresh Codex session after updating.
 
-## 1.1.4 — 2026-09-28
+## 1.1.4 â€” 2026-09-28
 
 ### Claude Code
 
@@ -63,7 +73,7 @@
   (the same rates as Sonnet 5, with a 1M-token window), maps the midlevel role to it, and keeps
   `claude-sonnet-5` for older transcripts. All rates were rechecked on 2026-09-28. The docs now say Sonnet 5.5.
 
-## 1.1.3 — 2026-09-26
+## 1.1.3 â€” 2026-09-26
 
 ### Claude Code
 
@@ -123,7 +133,7 @@
 - Dependencies, areas, and families are recorded in the goal state's task view; follow-on briefs carry the
   prior worker's result and exact findings. New thread IDs must be unique within a goal.
 
-## 1.1.2 — 2026-09-26
+## 1.1.2 â€” 2026-09-26
 
 ### Claude Code
 
@@ -151,7 +161,7 @@
   runtime status is retained. Interrupting or retiring a worker is not treated as
   confirmation that a concurrency slot was released.
 
-## 1.1.1 — 2026-09-25
+## 1.1.1 â€” 2026-09-25
 
 ### Claude Code
 
@@ -169,7 +179,7 @@
   tokens or half its context window, whichever is lower.
 - Close agents that are unlikely to get another assignment with `close_agent`.
 
-## 1.1.0 — 2026-09-25
+## 1.1.0 â€” 2026-09-25
 
 ### Claude Code
 
@@ -198,7 +208,7 @@
   ticket it for real engineers to choose task boundaries and owners. Bump the Codex plugin to
   1.1.0 so installed copies receive it.
 
-## 1.0.2 — 2026-09-24
+## 1.0.2 â€” 2026-09-24
 
 ### Claude Code
 
@@ -208,7 +218,7 @@
 
 - Choose manageable task boundaries from the current evidence, revise pending tasks after each result, and split work at consequential checkpoints while keeping simple repetitive operations together.
 
-## 1.0.1 — 2026-09-24
+## 1.0.1 â€” 2026-09-24
 
 ### Claude Code
 
@@ -218,7 +228,7 @@
 
 - Clarify direct `$rightsize-goal` invocation as the default usage path and align the Codex plugin version with the 1.0.1 repository release.
 
-## 1.0.0 — 2026-09-24
+## 1.0.0 â€” 2026-09-24
 
 ### Claude Code
 

@@ -12,7 +12,7 @@ description = "Junior engineer for very basic explicit tasks and factual researc
 config_file = "../codex/.codex/agents/rightsize-junior-doer.toml"
 
 [agents.rightsize-midlevel-doer]
-description = "Midlevel engineer for bounded work using established patterns."
+description = "Midlevel at Terra/high for scoped coding and visual/app workflows."
 config_file = "../codex/.codex/agents/rightsize-midlevel-doer.toml"
 
 [agents.rightsize-senior-doer]
@@ -24,5 +24,13 @@ description = "Staff engineer for the most complex work before Astra escalation.
 config_file = "../codex/.codex/agents/rightsize-staff-doer.toml"
 
 [agents.rightsize-principal-doer]
-description = "Principal engineer for bounded expert work after documented Sol struggle."
+description = "Principal engineer for bounded expert work after Sol struggle or justified --astra direct routing."
 config_file = "../codex/.codex/agents/rightsize-principal-doer.toml"
+
+[agents.rightsize-junior-plus-doer]
+description = "Junior Plus at Luna/xhigh for routine bounded work."
+config_file = "../codex/.codex/agents/rightsize-junior-plus-doer.toml"
+
+[agents.rightsize-writer]
+description = "Writer at Terra/medium for prose, documentation, and UX microcopy."
+config_file = "../codex/.codex/agents/rightsize-writer.toml"

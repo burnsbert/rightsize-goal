@@ -1,10 +1,20 @@
 # Installation and maintenance
 
+## October 2026 roster upgrade
+
+There are now seven workers. Midlevel changes from Luna/xhigh to Terra 6.1/high;
+the old configuration is retained as Junior Plus. Writer adds Terra 6.1/medium.
+Terra requires Codex CLI 0.159.0 or later and model access in the chosen host.
+Re-run the installer for both copy and symlink installations to add the new roles.
+Use the normal force option with backups when existing files conflict, verify,
+and start a fresh Codex session. Historical logs retain their original model IDs.
+This upgrade does not change the Claude Code distribution.
+
 ## Choose an install path
 
 For the complete workflow, clone or extract the repository and run
 `python codex/install.py` from the repository root, then
-`python codex/install.py --verify`. This installs the skill and five agents.
+`python codex/install.py --verify`. This installs the skill and seven agents.
 
 Codex's plugin marketplace also offers the Codex skill alone:
 
@@ -16,7 +26,7 @@ codex plugin add rightsize-goal@rightsize-goal
 The repo's `.agents/plugins/marketplace.json` points to `./codex`; the separate
 `.claude-plugin/marketplace.json` remains for Claude Code. The plugin cache
 contains the Codex skill and its helper scripts, but Codex plugins cannot yet
-ship the five custom agents. Run the installer for those roles and the full
+ship the seven custom agents. Run the installer for those roles and the full
 workflow. Do not use the plugin route and manual route together: both install
 the skill, and their copies can get out of sync. If you installed the plugin
 first, remove it with `codex plugin remove rightsize-goal@rightsize-goal`
@@ -92,7 +102,7 @@ python codex/install.py --verify --legacy-config
 ```
 
 PowerShell uses `-LegacyConfig`. This mode backs up changed configuration and
-replaces only the five named registrations and removes retired upper-midlevel,
+replaces only the seven named registrations and removes retired upper-midlevel,
 lower-senior, and generic Astra registrations. Unsupported config layouts are rejected
 rather than rewritten unsafely. It does not make unavailable models or goal tools
 available. New default installs do not remove prior legacy registrations.
@@ -144,10 +154,12 @@ of installed source files.
 ## Uninstall
 
 Close Codex. Remove only `rightsize-goal` from the installed skills directory and
-the five current files below from the installed agents directory:
+the seven current files below from the installed agents directory:
 
 ```text
 rightsize-junior-doer.toml
+rightsize-junior-plus-doer.toml
+rightsize-writer.toml
 rightsize-midlevel-doer.toml
 rightsize-senior-doer.toml
 rightsize-staff-doer.toml
@@ -155,7 +167,7 @@ rightsize-principal-doer.toml
 ```
 
 For symlink installs, remove the links themselves, not their targets. If you used
-legacy mode, remove the matching five `[agents.rightsize-...]` tables from
+legacy mode, remove the matching seven `[agents.rightsize-...]` tables from
 `config.toml`, leaving other tables/settings intact. Restart Codex.
 Older installations may also contain retired `rightsize-upper-midlevel-doer`,
 `rightsize-lower-senior-doer`, and `rightsize-astra-doer` files or config tables; remove those exact entries too.
@@ -167,7 +179,7 @@ There is currently no automated uninstall command.
 
 - **Skill or agents missing:** start a fresh session; check destinations and
   `CODEX_HOME`; run `--verify`. An older host may need legacy mode. Installing
-  only the skill with a generic skill installer omits the five agent definitions.
+  only the skill with a generic skill installer omits the seven agent definitions.
 - **Model unavailable:** inspect your account/host's model access. Installing a
   role does not grant access. Do not silently replace model names and assume
   the original routing or pricing still applies.

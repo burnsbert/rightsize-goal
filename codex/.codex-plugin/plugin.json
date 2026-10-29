@@ -1,6 +1,6 @@
 {
   "name": "rightsize-goal",
-  "version": "1.1.7",
+  "version": "1.2.0",
   "description": "Cost-aware goal workflow for Codex.",
   "author": {
     "name": "Eric Burns"
@@ -9,10 +9,15 @@
   "interface": {
     "displayName": "Rightsize Goal",
     "shortDescription": "Cost-aware goal routing for Codex",
-    "longDescription": "A Codex skill for routing and tracking substantial goals. Install the five custom agents separately with codex/install.py for the full workflow.",
+    "longDescription": "A Codex skill for routing and tracking substantial goals. Install the seven custom agents separately with codex/install.py for the full workflow.",
     "developerName": "Eric Burns",
     "category": "Productivity",
-    "capabilities": ["Read", "Write"],
-    "defaultPrompt": ["Use Rightsize Goal to complete this objective."]
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Use Rightsize Goal to complete this objective."
+    ]
   }
 }
